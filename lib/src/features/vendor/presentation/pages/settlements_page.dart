@@ -127,6 +127,9 @@ double _amount(Object? value) {
 }
 
 String _settlementTitle(Map<String, dynamic> row) {
+  final normalized =
+      _firstSettlementText(row, const ['settlement_title', 'title']);
+  if (normalized.isNotEmpty) return normalized;
   final explicit = _firstSettlementText(row, const [
     'settlementNumber',
     'settlement_number',
@@ -161,6 +164,9 @@ String _settlementTitle(Map<String, dynamic> row) {
 }
 
 String _orderLabel(Map<String, dynamic> row) {
+  final normalized =
+      _firstSettlementText(row, const ['order_label', 'order_ref']);
+  if (normalized.isNotEmpty) return normalized;
   final direct = _firstSettlementText(row, const [
     'orderNumber',
     'order_number',

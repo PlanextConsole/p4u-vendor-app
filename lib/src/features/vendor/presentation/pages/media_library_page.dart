@@ -11,7 +11,7 @@ import '../../data/vendor_providers.dart';
 final mediaFolderProvider = StateProvider<String>((_) => 'all');
 final mediaSearchProvider = StateProvider<String>((_) => '');
 
-final vendorMediaProvider = FutureProvider.autoDispose((ref) async {
+final vendorMediaProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) return <Map<String, dynamic>>[];
   final folder = ref.watch(mediaFolderProvider);

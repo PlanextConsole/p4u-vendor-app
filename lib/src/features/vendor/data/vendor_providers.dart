@@ -15,13 +15,13 @@ final currentVendorProvider = Provider<VendorUser?>((ref) {
   return ref.watch(authStateProvider).valueOrNull;
 });
 
-final dashboardProvider = FutureProvider.autoDispose((ref) async {
+final dashboardProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) throw StateError('Not signed in');
   return ref.watch(vendorRepositoryProvider).dashboard(vendorId);
 });
 
-final vendorProductsProvider = FutureProvider.autoDispose((ref) async {
+final vendorProductsProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   final vendor = ref.watch(currentVendorProvider);
   if (vendorId == null || vendor?.hasProductFlow == false) {
@@ -30,7 +30,7 @@ final vendorProductsProvider = FutureProvider.autoDispose((ref) async {
   return ref.watch(vendorRepositoryProvider).products(vendorId);
 });
 
-final vendorServicesProvider = FutureProvider.autoDispose((ref) async {
+final vendorServicesProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   final vendor = ref.watch(currentVendorProvider);
   if (vendorId == null || vendor?.hasServiceFlow != true) {
@@ -39,7 +39,7 @@ final vendorServicesProvider = FutureProvider.autoDispose((ref) async {
   return ref.watch(vendorRepositoryProvider).services(vendorId);
 });
 
-final vendorOrdersProvider = FutureProvider.autoDispose((ref) async {
+final vendorOrdersProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   final vendor = ref.watch(currentVendorProvider);
   if (vendorId == null || vendor?.hasProductFlow == false) {
@@ -48,7 +48,7 @@ final vendorOrdersProvider = FutureProvider.autoDispose((ref) async {
   return ref.watch(vendorRepositoryProvider).orders(vendorId);
 });
 
-final vendorBookingsProvider = FutureProvider.autoDispose((ref) async {
+final vendorBookingsProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   final vendor = ref.watch(currentVendorProvider);
   if (vendorId == null || vendor?.hasServiceFlow != true) {
@@ -57,31 +57,37 @@ final vendorBookingsProvider = FutureProvider.autoDispose((ref) async {
   return ref.watch(vendorRepositoryProvider).bookings(vendorId);
 });
 
-final vendorSettlementsProvider = FutureProvider.autoDispose((ref) async {
+final vendorSettlementsProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) return <Map<String, dynamic>>[];
   return ref.watch(vendorRepositoryProvider).settlements(vendorId);
 });
 
-final settlementStatsProvider = FutureProvider.autoDispose((ref) async {
-  final vendorId = ref.watch(vendorIdProvider);
-  if (vendorId == null) throw StateError('Not signed in');
-  return ref.watch(vendorRepositoryProvider).settlementStats(vendorId);
+final settlementStatsProvider = FutureProvider((ref) async {
+  final rows = await ref.watch(vendorSettlementsProvider.future);
+  double sumWhere(bool Function(Map<String, dynamic>) test) =>
+      rows.where(test).fold(0, (sum, row) => sum + moneyOf(row, 'net_amount'));
+  return SettlementStats(
+    totalEarned: sumWhere((_) => true),
+    pending: sumWhere((r) => ['pending', 'eligible'].contains(r['status'])),
+    settled: sumWhere((r) => r['status'] == 'settled'),
+    rejected: sumWhere((r) => r['status'] == 'rejected'),
+  );
 });
 
-final vendorProfileProvider = FutureProvider.autoDispose((ref) async {
+final vendorProfileProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) return <String, dynamic>{};
   return ref.watch(vendorRepositoryProvider).profile(vendorId);
 });
 
-final vendorBanksProvider = FutureProvider.autoDispose((ref) async {
+final vendorBanksProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) return <Map<String, dynamic>>[];
   return ref.watch(vendorRepositoryProvider).bankAccounts(vendorId);
 });
 
-final vendorNotificationsProvider = FutureProvider.autoDispose((ref) async {
+final vendorNotificationsProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) return <Map<String, dynamic>>[];
   return ref.watch(vendorRepositoryProvider).notifications(vendorId);

@@ -315,6 +315,8 @@ class _ShippingDialogState extends State<_ShippingDialog> {
 }
 
 String _orderTitle(Map<String, dynamic> order) {
+  final normalized = _firstOrderText(order, const ['order_title', 'title']);
+  if (normalized.isNotEmpty) return normalized;
   final explicit = _firstOrderText(order, const [
     'orderNumber',
     'order_number',

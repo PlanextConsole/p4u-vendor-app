@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/services/api_client.dart';
@@ -602,34 +603,112 @@ class VendorRepository {
             row.s('status', row['isActive'] == false ? 'inactive' : 'active'),
       };
 
-  Map<String, dynamic> _normalizeOrder(Map<String, dynamic> row) => {
-        ...row,
-        'id': row.s('id', row.s('orderId')),
-        'total': row.n('total', row.n('totalAmount', row.n('grandTotal'))),
-        'created_at': row.s('created_at', row.s('createdAt')),
-        'payment_status': row.s('payment_status', row.s('paymentStatus')),
-      };
+  Map<String, dynamic> _normalizeOrder(Map<String, dynamic> row) {
+    final metadata = _metadata(row);
+    final lines = _lineItems(row, metadata).map(_normalizeOrderLine).toList();
+    final customer = _customerName(row, metadata);
+    final displayRef = _displayOrderRef(row, metadata);
+    final title = _orderTitle(row, metadata, lines, customer, displayRef);
+    return {
+      ...row,
+      'id': row.s('id', row.s('orderId')),
+      'order_ref': displayRef,
+      'orderRef': displayRef,
+      'order_title': title,
+      'title': title,
+      'customer_name': customer,
+      'customerName': customer,
+      'items': lines,
+      'total': row.n('total', row.n('totalAmount', row.n('grandTotal'))),
+      'created_at': row.s('created_at', row.s('createdAt')),
+      'payment_status': row.s('payment_status', row.s('paymentStatus')),
+    };
+  }
 
-  Map<String, dynamic> _normalizeBooking(Map<String, dynamic> row) => {
-        ...row,
-        'id': row.s('id', row.s('bookingId')),
-        'booking_date': row.s('booking_date', row.s('bookingDate')),
-        'total_amount': row.n('total_amount', row.n('totalAmount')),
-        'total': row.n('total', row.n('total_amount', row.n('totalAmount'))),
-      };
+  Map<String, dynamic> _normalizeBooking(Map<String, dynamic> row) {
+    final metadata = _metadata(row);
+    final customer = _customerName(row, metadata);
+    final serviceName = _firstReadable([
+      row['service_name'],
+      row['serviceName'],
+      row['catalogName'],
+      row['displayName'],
+      metadata['serviceName'],
+      metadata['catalogName'],
+      metadata['displayName'],
+      row['name'],
+      row['title'],
+    ]);
+    final title = serviceName.isNotEmpty ? serviceName : 'Service booking';
+    return {
+      ...row,
+      'id': row.s('id', row.s('bookingId')),
+      'booking_date': row.s('booking_date', row.s('bookingDate')),
+      'service_name': title,
+      'serviceName': title,
+      'order_title': title,
+      'title': title,
+      'customer_name': customer,
+      'customerName': customer,
+      'total_amount': row.n('total_amount', row.n('totalAmount')),
+      'total': row.n('total', row.n('total_amount', row.n('totalAmount'))),
+    };
+  }
 
-  Map<String, dynamic> _normalizeSettlement(Map<String, dynamic> row) => {
-        ...row,
-        'id': row.s('id', row.s('settlementId')),
-        'net_amount': row.n('net_amount', row.n('netAmount', row.n('amount'))),
-        'gross_amount':
-            row.n('gross_amount', row.n('grossAmount', row.n('amount'))),
-        'platform_fee':
-            row.n('platform_fee', row.n('platformFee', row.n('commission'))),
-        'amount': row.n('amount', row.n('gross_amount', row.n('grossAmount'))),
-        'commission':
-            row.n('commission', row.n('platform_fee', row.n('platformFee'))),
-      };
+  Map<String, dynamic> _normalizeSettlement(Map<String, dynamic> row) {
+    final metadata = _metadata(row);
+    final customer = _customerName(row, metadata);
+    final orderRef = _firstReadable([
+      metadata['orderRef'],
+      metadata['order_ref'],
+      row['orderRef'],
+      row['order_ref'],
+      row['orderNumber'],
+      row['order_number'],
+    ]);
+    final displayRef = _firstReadable([
+      metadata['displayRef'],
+      metadata['settlementCode'],
+      metadata['code'],
+      row['settlementNumber'],
+      row['settlement_number'],
+      row['reference'],
+      row['referenceNumber'],
+    ]);
+    final serviceName = _firstReadable([
+      metadata['serviceName'],
+      metadata['catalogName'],
+      row['service_name'],
+      row['serviceName'],
+    ]);
+    final settlementTitle = displayRef.isNotEmpty
+        ? displayRef
+        : serviceName.isNotEmpty
+            ? '$serviceName settlement'
+            : orderRef.isNotEmpty
+                ? '$orderRef settlement'
+                : customer.isNotEmpty && customer != 'Customer'
+                    ? '$customer settlement'
+                    : _shortCode('STL', row.s('id', row.s('settlementId')));
+    return {
+      ...row,
+      'id': row.s('id', row.s('settlementId')),
+      'settlement_title': settlementTitle,
+      'title': settlementTitle,
+      'order_label': orderRef,
+      'order_ref': orderRef,
+      'customer_name': customer,
+      'customerName': customer,
+      'net_amount': row.n('net_amount', row.n('netAmount', row.n('amount'))),
+      'gross_amount':
+          row.n('gross_amount', row.n('grossAmount', row.n('amount'))),
+      'platform_fee':
+          row.n('platform_fee', row.n('platformFee', row.n('commission'))),
+      'amount': row.n('amount', row.n('gross_amount', row.n('grossAmount'))),
+      'commission':
+          row.n('commission', row.n('platform_fee', row.n('platformFee'))),
+    };
+  }
 
   Map<String, dynamic> _normalizeNotification(Map<String, dynamic> row) => {
         ...row,
@@ -650,6 +729,133 @@ class VendorRepository {
         'created_at': row.s('created_at', row.s('createdAt')),
       };
 
+  Map<String, dynamic> _metadata(Map<String, dynamic> row) {
+    final raw = row['metadata'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _lineItems(
+      Map<String, dynamic> row, Map<String, dynamic> metadata) {
+    final raw = metadata['items'] ?? metadata['lines'] ?? row['items'];
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Map<String, dynamic> _normalizeOrderLine(Map<String, dynamic> line) {
+    final meta = _metadata(line);
+    final title = _firstReadable([
+      line['name'],
+      line['productName'],
+      line['product_name'],
+      line['title'],
+      meta['productName'],
+      meta['name'],
+      meta['title'],
+    ]);
+    return {
+      ...line,
+      'title': title.isEmpty ? 'Item' : title,
+      'name': title.isEmpty ? 'Item' : title,
+      'productName': title.isEmpty ? 'Item' : title,
+      'qty': line['quantity'] ?? line['qty'] ?? 1,
+      'quantity': line['quantity'] ?? line['qty'] ?? 1,
+      'image': _resolveUrl(_imageFrom({
+        ...meta,
+        ...line
+      }, const [
+        'thumbnailUrl',
+        'imageUrl',
+        'productImage',
+        'image',
+        'thumbnail'
+      ])),
+    };
+  }
+
+  String _displayOrderRef(
+      Map<String, dynamic> row, Map<String, dynamic> metadata) {
+    final ref = _firstReadable([
+      metadata['displayId'],
+      metadata['orderRef'],
+      metadata['order_ref'],
+      row['orderRef'],
+      row['order_ref'],
+      row['orderNumber'],
+      row['order_number'],
+      row['orderCode'],
+      row['order_code'],
+    ]);
+    return ref.isNotEmpty
+        ? ref
+        : _shortCode('ORD', row.s('id', row.s('orderId')));
+  }
+
+  String _customerName(
+      Map<String, dynamic> row, Map<String, dynamic> metadata) {
+    final customer = metadata['customer'] ?? row['customer'];
+    final nested = customer is Map ? Map<String, dynamic>.from(customer) : null;
+    final name = _firstReadable([
+      metadata['customerName'],
+      metadata['customer_name'],
+      row['customerName'],
+      row['customer_name'],
+      nested?['name'],
+      nested?['fullName'],
+      nested?['full_name'],
+      nested?['mobile'],
+      nested?['phone'],
+    ]);
+    return name.isEmpty ? 'Customer' : name;
+  }
+
+  String _orderTitle(Map<String, dynamic> row, Map<String, dynamic> metadata,
+      List<Map<String, dynamic>> lines, String customer, String displayRef) {
+    final explicit = _firstReadable([
+      row['title'],
+      row['name'],
+      metadata['title'],
+      metadata['displayName'],
+    ]);
+    if (explicit.isNotEmpty) return explicit;
+    if (lines.isNotEmpty) {
+      final first = lines.first.s('title', lines.first.s('name'));
+      if (first.isNotEmpty && first != 'Item') {
+        return lines.length > 1 ? '$first + ${lines.length - 1} more' : first;
+      }
+    }
+    if (customer.isNotEmpty && customer != 'Customer') return '$customer order';
+    return displayRef.isNotEmpty ? displayRef : 'Customer order';
+  }
+
+  String _firstReadable(List<Object?> values) {
+    for (final value in values) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty && !_looksLikeUuid(text)) return text;
+    }
+    return '';
+  }
+
+  String _shortCode(String prefix, String id) {
+    final clean = id.replaceAll('-', '').trim();
+    if (clean.length >= 7) {
+      return '$prefix-${clean.substring(0, 3).toUpperCase()}-${clean.substring(clean.length - 4).toUpperCase()}';
+    }
+    return prefix;
+  }
+
+  bool _looksLikeUuid(String value) => RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      ).hasMatch(value.trim());
   String _vendorType(Map<String, dynamic> row) {
     final value = (row['vendorType'] ??
             row['vendor_type'] ??
