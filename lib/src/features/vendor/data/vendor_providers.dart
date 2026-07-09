@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/data/auth_repository.dart';
+import '../domain/vendor_models.dart';
 import 'vendor_repository.dart';
 
 final vendorRepositoryProvider = Provider((ref) => VendorRepository());
@@ -8,6 +9,10 @@ final vendorRepositoryProvider = Provider((ref) => VendorRepository());
 final vendorIdProvider = Provider<String?>((ref) {
   final auth = ref.watch(authStateProvider);
   return auth.valueOrNull?.id;
+});
+
+final currentVendorProvider = Provider<VendorUser?>((ref) {
+  return ref.watch(authStateProvider).valueOrNull;
 });
 
 final dashboardProvider = FutureProvider.autoDispose((ref) async {
@@ -18,25 +23,37 @@ final dashboardProvider = FutureProvider.autoDispose((ref) async {
 
 final vendorProductsProvider = FutureProvider.autoDispose((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
-  if (vendorId == null) return <Map<String, dynamic>>[];
+  final vendor = ref.watch(currentVendorProvider);
+  if (vendorId == null || vendor?.hasProductFlow == false) {
+    return <Map<String, dynamic>>[];
+  }
   return ref.watch(vendorRepositoryProvider).products(vendorId);
 });
 
 final vendorServicesProvider = FutureProvider.autoDispose((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
-  if (vendorId == null) return <Map<String, dynamic>>[];
+  final vendor = ref.watch(currentVendorProvider);
+  if (vendorId == null || vendor?.hasServiceFlow != true) {
+    return <Map<String, dynamic>>[];
+  }
   return ref.watch(vendorRepositoryProvider).services(vendorId);
 });
 
 final vendorOrdersProvider = FutureProvider.autoDispose((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
-  if (vendorId == null) return <Map<String, dynamic>>[];
+  final vendor = ref.watch(currentVendorProvider);
+  if (vendorId == null || vendor?.hasProductFlow == false) {
+    return <Map<String, dynamic>>[];
+  }
   return ref.watch(vendorRepositoryProvider).orders(vendorId);
 });
 
 final vendorBookingsProvider = FutureProvider.autoDispose((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
-  if (vendorId == null) return <Map<String, dynamic>>[];
+  final vendor = ref.watch(currentVendorProvider);
+  if (vendorId == null || vendor?.hasServiceFlow != true) {
+    return <Map<String, dynamic>>[];
+  }
   return ref.watch(vendorRepositoryProvider).bookings(vendorId);
 });
 

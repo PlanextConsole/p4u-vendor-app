@@ -98,7 +98,7 @@ class SettlementTile extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w800))),
                 StatusBadge(row['status']?.toString() ?? 'pending'),
                 const SizedBox(width: 8),
-                Text(currency.format(row['net_amount'] ?? 0),
+                Text(currency.format(_amount(row['net_amount'])),
                     style: const TextStyle(
                         fontWeight: FontWeight.w900, color: Colors.green)),
               ],
@@ -108,11 +108,16 @@ class SettlementTile extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: Colors.black54)),
             const SizedBox(height: 4),
             Text(
-                'Gross: ${currency.format(row['amount'] ?? 0)} - Commission: ${currency.format(row['commission'] ?? 0)}',
+                'Gross: ${currency.format(_amount(row['gross_amount'] ?? row['amount']))} - Commission: ${currency.format(_amount(row['platform_fee'] ?? row['commission']))}',
                 style: const TextStyle(fontSize: 12, color: Colors.black54)),
           ],
         ),
       ),
     );
   }
+}
+
+double _amount(Object? value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
 }

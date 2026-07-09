@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/vendor/domain/vendor_models.dart';
 import '../theme/app_theme.dart';
 
 class VendorScaffold extends ConsumerWidget {
@@ -17,23 +18,49 @@ class VendorScaffold extends ConsumerWidget {
   final Widget child;
   final List<Widget> actions;
 
-  static const destinations = [
-    _Destination('Home', '/', Icons.dashboard_rounded),
-    _Destination('Products', '/products', Icons.inventory_2_rounded),
-    _Destination('Orders', '/orders', Icons.shopping_cart_rounded),
-    _Destination('Payments', '/settlements', Icons.currency_rupee_rounded),
-    _Destination('Profile', '/profile', Icons.person_rounded),
-  ];
+  static List<_Destination> _bottomDestinationsFor(VendorUser? vendor) {
+    if (vendor?.isServiceVendor == true) {
+      return const [
+        _Destination('Home', '/', Icons.dashboard_rounded),
+        _Destination('Services', '/services', Icons.handyman_rounded),
+        _Destination('Bookings', '/bookings', Icons.event_available_rounded),
+        _Destination('Payments', '/settlements', Icons.currency_rupee_rounded),
+        _Destination('Profile', '/profile', Icons.person_rounded),
+      ];
+    }
+    return const [
+      _Destination('Home', '/', Icons.dashboard_rounded),
+      _Destination('Products', '/products', Icons.inventory_2_rounded),
+      _Destination('Orders', '/orders', Icons.shopping_cart_rounded),
+      _Destination('Payments', '/settlements', Icons.currency_rupee_rounded),
+      _Destination('Profile', '/profile', Icons.person_rounded),
+    ];
+  }
+
+  static bool isBlockedForVendor(String path, VendorUser? vendor) {
+    if (vendor == null || vendor.isBothVendor) return false;
+    const serviceOnly = {'/services', '/availability', '/bookings'};
+    const productOnly = {'/products', '/orders'};
+    if (vendor.isProductVendor && serviceOnly.contains(path)) return true;
+    if (vendor.isServiceVendor && productOnly.contains(path)) return true;
+    return false;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.path;
     final auth = ref.watch(authStateProvider);
-    if (!auth.isLoading && auth.valueOrNull == null) {
+    final vendor = auth.valueOrNull;
+    if (!auth.isLoading && vendor == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/login');
       });
+    } else if (isBlockedForVendor(location, vendor)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/');
+      });
     }
+    final destinations = _bottomDestinationsFor(vendor);
     final current = destinations.indexWhere((d) => d.path == location);
     return Scaffold(
       appBar: AppBar(
@@ -72,18 +99,23 @@ class _VendorDrawer extends ConsumerWidget {
 
   final String activePath;
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final vendor = ref.watch(authStateProvider).valueOrNull;
-    final items = [
+  List<_Destination> _itemsFor(VendorUser? vendor) {
+    final hasProduct = vendor?.hasProductFlow != false;
+    final hasService = vendor?.hasServiceFlow == true;
+    return [
       const _Destination('Dashboard', '/', Icons.dashboard_rounded),
-      const _Destination('Products', '/products', Icons.inventory_2_rounded),
-      const _Destination('Services', '/services', Icons.handyman_rounded),
-      const _Destination(
-          'Availability', '/availability', Icons.calendar_month_rounded),
-      const _Destination('Orders', '/orders', Icons.shopping_cart_rounded),
-      const _Destination(
-          'Bookings', '/bookings', Icons.event_available_rounded),
+      if (hasProduct)
+        const _Destination('Products', '/products', Icons.inventory_2_rounded),
+      if (hasService)
+        const _Destination('Services', '/services', Icons.handyman_rounded),
+      if (hasService)
+        const _Destination(
+            'Availability', '/availability', Icons.calendar_month_rounded),
+      if (hasProduct)
+        const _Destination('Orders', '/orders', Icons.shopping_cart_rounded),
+      if (hasService)
+        const _Destination(
+            'Bookings', '/bookings', Icons.event_available_rounded),
       const _Destination(
           'Settlements', '/settlements', Icons.currency_rupee_rounded),
       const _Destination('Payment History', '/payments', Icons.history_rounded),
@@ -99,6 +131,12 @@ class _VendorDrawer extends ConsumerWidget {
       const _Destination('Account Control', '/account-control',
           Icons.admin_panel_settings_rounded),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vendor = ref.watch(authStateProvider).valueOrNull;
+    final items = _itemsFor(vendor);
     return Drawer(
       child: SafeArea(
         child: Column(

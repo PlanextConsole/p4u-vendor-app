@@ -10,9 +10,20 @@ class VendorRepository {
 
   Future<VendorDashboard> dashboard(String vendorId) async {
     final vendor = await profile(vendorId);
-    final products = await this.products(vendorId);
-    final services = await this.services(vendorId);
-    final orders = await this.orders(vendorId);
+    final vendorType = _vendorType(vendor);
+    final hasProductFlow = vendorType != 'SERVICE';
+    final hasServiceFlow = vendorType == 'SERVICE' || vendorType == 'BOTH';
+    final products = hasProductFlow
+        ? await this.products(vendorId)
+        : <Map<String, dynamic>>[];
+    final services = hasServiceFlow
+        ? await this.services(vendorId)
+        : <Map<String, dynamic>>[];
+    final orders = hasProductFlow
+        ? await this.orders(vendorId)
+        : hasServiceFlow
+            ? await bookings(vendorId)
+            : <Map<String, dynamic>>[];
     final settlements = await this.settlements(vendorId);
     final rating = await ratingSummary(vendorId);
     return VendorDashboard(
@@ -115,7 +126,7 @@ class VendorRepository {
 
   Future<Map<String, dynamic>?> order(String id) async {
     final data = await _safeMap(
-        () => _api.getJson('/api/v1/vendor/orders/', auth: true));
+        () => _api.getJson('/api/v1/vendor/orders/$id', auth: true));
     return data == null ? null : _normalizeOrder(data);
   }
 
@@ -139,7 +150,7 @@ class VendorRepository {
 
   Future<Map<String, dynamic>?> booking(String id) async {
     final data = await _safeMap(
-        () => _api.getJson('/api/v1/vendor/bookings/', auth: true));
+        () => _api.getJson('/api/v1/vendor/bookings/$id', auth: true));
     return data == null ? null : _normalizeBooking(data);
   }
 
@@ -169,7 +180,7 @@ class VendorRepository {
 
   Future<Map<String, dynamic>?> settlement(String id) async {
     final data = await _safeMap(
-        () => _api.getJson('/api/v1/vendor/me/settlements/', auth: true));
+        () => _api.getJson('/api/v1/vendor/me/settlements/$id', auth: true));
     return data == null ? null : _normalizeSettlement(data);
   }
 
@@ -332,7 +343,8 @@ class VendorRepository {
 
   Future<void> deleteMediaFolder(String folderId) async {
     if (folderId.isEmpty) return;
-    await _api.deleteJson('/api/v1/vendor/me/media/folders/', auth: true);
+    await _api.deleteJson('/api/v1/vendor/me/media/folders/$folderId',
+        auth: true);
   }
 
   Future<List<Map<String, dynamic>>> media(String vendorId,
@@ -390,7 +402,7 @@ class VendorRepository {
         : <String, dynamic>{};
     final tickets = apiItems(metadata['supportTickets']);
     tickets.insert(0, {
-      'id': 'ticket-',
+      'id': 'ticket-${DateTime.now().millisecondsSinceEpoch}',
       'vendorName': vendorName,
       'subject': subject,
       'description': description,
@@ -520,24 +532,31 @@ class VendorRepository {
         'ifsc': values.s('bank_ifsc', values.s('ifsc_code')),
       };
 
-  Map<String, dynamic> _normalizeVendor(Map<String, dynamic> row) => {
-        ...row,
-        'id': row.s('id', row.s('vendorId')),
-        'name': row.s('name', row.s('ownerName')),
-        'business_name':
-            row.s('business_name', row.s('businessName', row.s('storeName'))),
-        'mobile': row.s('mobile', row.s('phone')),
-        'background_image': _resolveUrl(_imageFrom(row, const [
-          'background_image',
-          'backgroundImage',
-          'bannerUrl',
-          'banner_url',
-          'coverImage',
-          'thumbnailUrl'
-        ])),
-        'logo': _resolveUrl(_imageFrom(
-            row, const ['logo', 'logoUrl', 'thumbnailUrl', 'thumbnail_url'])),
-      };
+  Map<String, dynamic> _normalizeVendor(Map<String, dynamic> row) {
+    final vendorType = _vendorType(row);
+    return {
+      ...row,
+      'id': row.s('id', row.s('vendorId')),
+      'name': row.s('name', row.s('ownerName')),
+      'business_name':
+          row.s('business_name', row.s('businessName', row.s('storeName'))),
+      'mobile': row.s('mobile', row.s('phone')),
+      'vendorType': vendorType,
+      'vendor_type': vendorType,
+      'vendorKind': vendorType,
+      'vendor_kind': vendorType,
+      'background_image': _resolveUrl(_imageFrom(row, const [
+        'background_image',
+        'backgroundImage',
+        'bannerUrl',
+        'banner_url',
+        'coverImage',
+        'thumbnailUrl'
+      ])),
+      'logo': _resolveUrl(_imageFrom(
+          row, const ['logo', 'logoUrl', 'thumbnailUrl', 'thumbnail_url'])),
+    };
+  }
 
   Map<String, dynamic> _normalizeProduct(Map<String, dynamic> row) => {
         ...row,
@@ -596,14 +615,20 @@ class VendorRepository {
         'id': row.s('id', row.s('bookingId')),
         'booking_date': row.s('booking_date', row.s('bookingDate')),
         'total_amount': row.n('total_amount', row.n('totalAmount')),
+        'total': row.n('total', row.n('total_amount', row.n('totalAmount'))),
       };
 
   Map<String, dynamic> _normalizeSettlement(Map<String, dynamic> row) => {
         ...row,
         'id': row.s('id', row.s('settlementId')),
         'net_amount': row.n('net_amount', row.n('netAmount', row.n('amount'))),
-        'gross_amount': row.n('gross_amount', row.n('grossAmount')),
-        'platform_fee': row.n('platform_fee', row.n('platformFee')),
+        'gross_amount':
+            row.n('gross_amount', row.n('grossAmount', row.n('amount'))),
+        'platform_fee':
+            row.n('platform_fee', row.n('platformFee', row.n('commission'))),
+        'amount': row.n('amount', row.n('gross_amount', row.n('grossAmount'))),
+        'commission':
+            row.n('commission', row.n('platform_fee', row.n('platformFee'))),
       };
 
   Map<String, dynamic> _normalizeNotification(Map<String, dynamic> row) => {
@@ -624,6 +649,20 @@ class VendorRepository {
         'file_size': row.i('file_size', row.i('fileSize')),
         'created_at': row.s('created_at', row.s('createdAt')),
       };
+
+  String _vendorType(Map<String, dynamic> row) {
+    final value = (row['vendorType'] ??
+            row['vendor_type'] ??
+            row['vendorKind'] ??
+            row['vendor_kind'] ??
+            row['category'] ??
+            'PRODUCT')
+        .toString()
+        .trim()
+        .toUpperCase();
+    if (value == 'SERVICE' || value == 'BOTH') return value;
+    return 'PRODUCT';
+  }
 
   String _uploadedUrl(Map<String, dynamic> data) {
     return _resolveUrl(_imageFrom(

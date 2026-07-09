@@ -25,7 +25,14 @@ class DashboardPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorCard(message: '$error'),
         data: (dashboard) {
-          final recentOrders = dashboard.orders.take(4).toList();
+          final recentActivity = dashboard.orders.take(4).toList();
+          final isServiceOnly = dashboard.isServiceVendor;
+          final itemLabel = isServiceOnly ? 'Services' : 'Products';
+          final activityLabel = isServiceOnly ? 'Bookings' : 'Orders';
+          final activityPath = isServiceOnly ? '/bookings' : '/orders';
+          final itemCount = isServiceOnly
+              ? dashboard.services.length
+              : dashboard.products.length;
           return RefreshIndicator(
             onRefresh: () => ref.refresh(dashboardProvider.future),
             child: ListView(
@@ -44,21 +51,26 @@ class DashboardPage extends ConsumerWidget {
                         icon: Icons.currency_rupee_rounded,
                         label: 'Total Revenue',
                         value: currency.format(dashboard.revenue),
-                        caption: '${dashboard.orders.length} orders'),
+                        caption:
+                            '${dashboard.orders.length} ${activityLabel.toLowerCase()}'),
                     MetricCard(
-                        icon: Icons.shopping_cart_rounded,
-                        label: 'Active Orders',
+                        icon: isServiceOnly
+                            ? Icons.event_available_rounded
+                            : Icons.shopping_cart_rounded,
+                        label: 'Active $activityLabel',
                         value: '${dashboard.activeOrders}'),
                     MetricCard(
-                        icon: Icons.inventory_2_rounded,
-                        label: 'Products',
-                        value: '${dashboard.products.length}'),
+                        icon: isServiceOnly
+                            ? Icons.handyman_rounded
+                            : Icons.inventory_2_rounded,
+                        label: itemLabel,
+                        value: '$itemCount'),
                     MetricCard(
                         icon: Icons.star_rounded,
                         label: 'Rating',
                         value: '${dashboard.vendor['rating'] ?? 0}',
                         caption:
-                            '${dashboard.vendor['total_orders'] ?? 0} total orders'),
+                            '${dashboard.vendor['total_orders'] ?? 0} total ${activityLabel.toLowerCase()}'),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -116,22 +128,22 @@ class DashboardPage extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          const Expanded(
-                              child: Text('Recent Orders',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.w800))),
+                          Expanded(
+                              child: Text('Recent $activityLabel',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800))),
                           TextButton(
-                              onPressed: () => context.go('/orders'),
+                              onPressed: () => context.go(activityPath),
                               child: const Text('View All')),
                         ],
                       ),
-                      if (recentOrders.isEmpty)
-                        const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 18),
-                            child: Text('No orders yet',
-                                style: TextStyle(color: Colors.black54)))
+                      if (recentActivity.isEmpty)
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            child: Text('No ${activityLabel.toLowerCase()} yet',
+                                style: const TextStyle(color: Colors.black54)))
                       else
-                        ...recentOrders.map((order) => ListTile(
+                        ...recentActivity.map((order) => ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
                               title: Text(order['id']?.toString() ?? '',
@@ -140,12 +152,16 @@ class DashboardPage extends ConsumerWidget {
                                       fontWeight: FontWeight.w700)),
                               subtitle: Text(
                                   order['customer_name']?.toString() ??
+                                      order['customerName']?.toString() ??
                                       'Customer'),
                               trailing: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(currency.format(order['total'] ?? 0),
+                                  Text(
+                                      currency.format(order['total'] ??
+                                          order['total_amount'] ??
+                                          0),
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w800)),
                                   StatusBadge(
@@ -161,11 +177,18 @@ class DashboardPage extends ConsumerWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _QuickLink(
-                        'Products', '/products', Icons.inventory_2_rounded),
-                    _QuickLink('Services', '/services', Icons.handyman_rounded),
-                    _QuickLink(
-                        'Orders', '/orders', Icons.shopping_cart_rounded),
+                    if (!isServiceOnly)
+                      _QuickLink(
+                          'Products', '/products', Icons.inventory_2_rounded),
+                    if (isServiceOnly || dashboard.isBothVendor)
+                      _QuickLink(
+                          'Services', '/services', Icons.handyman_rounded),
+                    if (isServiceOnly || dashboard.isBothVendor)
+                      _QuickLink('Bookings', '/bookings',
+                          Icons.event_available_rounded),
+                    if (!isServiceOnly)
+                      _QuickLink(
+                          'Orders', '/orders', Icons.shopping_cart_rounded),
                     _QuickLink('Settlements', '/settlements',
                         Icons.currency_rupee_rounded),
                     _QuickLink('Payments', '/payments', Icons.history_rounded),
