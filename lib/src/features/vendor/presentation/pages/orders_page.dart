@@ -157,10 +157,11 @@ class _OrderList extends ConsumerWidget {
                   Row(
                     children: [
                       Expanded(
-                          child: Text(order['id']?.toString() ?? '',
+                          child: Text(_orderTitle(order),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace'))),
+                                  fontWeight: FontWeight.w800))),
                       StatusBadge(status),
                       const SizedBox(width: 8),
                       Text(currency.format(order['total'] ?? 0),
@@ -312,3 +313,40 @@ class _ShippingDialogState extends State<_ShippingDialog> {
     );
   }
 }
+
+String _orderTitle(Map<String, dynamic> order) {
+  final explicit = _firstOrderText(order, const [
+    'orderNumber',
+    'order_number',
+    'orderCode',
+    'order_code',
+    'reference',
+    'referenceNumber'
+  ]);
+  if (explicit.isNotEmpty) return explicit;
+  final orderItems = order['items'];
+  if (orderItems is List && orderItems.isNotEmpty) {
+    final first = orderItems.first;
+    if (first is Map) {
+      final itemTitle = _firstOrderText(Map<String, dynamic>.from(first),
+          const ['title', 'name', 'productName', 'product_name']);
+      if (itemTitle.isNotEmpty) return itemTitle;
+    }
+  }
+  final customer =
+      _firstOrderText(order, const ['customer_name', 'customerName']);
+  if (customer.isNotEmpty && customer != 'Customer') return '$customer order';
+  return 'Customer order';
+}
+
+String _firstOrderText(Map<String, dynamic> row, List<String> keys) {
+  for (final key in keys) {
+    final value = row[key]?.toString().trim() ?? '';
+    if (value.isNotEmpty && !_looksLikeUuid(value)) return value;
+  }
+  return '';
+}
+
+bool _looksLikeUuid(String value) => RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());

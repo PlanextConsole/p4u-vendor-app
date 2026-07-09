@@ -94,7 +94,9 @@ class SettlementTile extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                    child: Text(row['id']?.toString() ?? '',
+                    child: Text(_settlementTitle(row),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w800))),
                 StatusBadge(row['status']?.toString() ?? 'pending'),
                 const SizedBox(width: 8),
@@ -103,9 +105,11 @@ class SettlementTile extends StatelessWidget {
                         fontWeight: FontWeight.w900, color: Colors.green)),
               ],
             ),
-            const SizedBox(height: 4),
-            Text('Order: ${row['order_id'] ?? ''}',
-                style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            if (_orderLabel(row).isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('Order: ${_orderLabel(row)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            ],
             const SizedBox(height: 4),
             Text(
                 'Gross: ${currency.format(_amount(row['gross_amount'] ?? row['amount']))} - Commission: ${currency.format(_amount(row['platform_fee'] ?? row['commission']))}',
@@ -121,3 +125,73 @@ double _amount(Object? value) {
   if (value is num) return value.toDouble();
   return double.tryParse(value?.toString() ?? '') ?? 0;
 }
+
+String _settlementTitle(Map<String, dynamic> row) {
+  final explicit = _firstSettlementText(row, const [
+    'settlementNumber',
+    'settlement_number',
+    'reference',
+    'referenceNumber',
+    'orderNumber',
+    'order_number',
+    'orderCode',
+    'order_code',
+    'customer_name',
+    'customerName',
+    'vendor_name',
+    'vendorName'
+  ]);
+  if (explicit.isNotEmpty) {
+    return explicit.contains('Settlement') ? explicit : '$explicit settlement';
+  }
+  final order = row['order'];
+  if (order is Map) {
+    final orderText =
+        _firstSettlementText(Map<String, dynamic>.from(order), const [
+      'orderNumber',
+      'order_number',
+      'orderCode',
+      'order_code',
+      'customer_name',
+      'customerName'
+    ]);
+    if (orderText.isNotEmpty) return '$orderText settlement';
+  }
+  return 'Order settlement';
+}
+
+String _orderLabel(Map<String, dynamic> row) {
+  final direct = _firstSettlementText(row, const [
+    'orderNumber',
+    'order_number',
+    'orderCode',
+    'order_code',
+    'order_ref',
+    'orderReference'
+  ]);
+  if (direct.isNotEmpty) return direct;
+  final order = row['order'];
+  if (order is Map) {
+    return _firstSettlementText(Map<String, dynamic>.from(order), const [
+      'orderNumber',
+      'order_number',
+      'orderCode',
+      'order_code',
+      'customer_name',
+      'customerName'
+    ]);
+  }
+  return '';
+}
+
+String _firstSettlementText(Map<String, dynamic> row, List<String> keys) {
+  for (final key in keys) {
+    final value = row[key]?.toString().trim() ?? '';
+    if (value.isNotEmpty && !_looksLikeUuid(value)) return value;
+  }
+  return '';
+}
+
+bool _looksLikeUuid(String value) => RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());

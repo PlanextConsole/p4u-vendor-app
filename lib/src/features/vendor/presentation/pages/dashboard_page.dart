@@ -146,9 +146,10 @@ class DashboardPage extends ConsumerWidget {
                         ...recentActivity.map((order) => ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              title: Text(order['id']?.toString() ?? '',
+                              title: Text(_activityTitle(order, activityLabel),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontFamily: 'monospace',
                                       fontWeight: FontWeight.w700)),
                               subtitle: Text(
                                   order['customer_name']?.toString() ??
@@ -238,3 +239,51 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Center(
       child: Padding(padding: const EdgeInsets.all(24), child: Text(message)));
 }
+
+String _activityTitle(Map<String, dynamic> row, String activityLabel) {
+  final explicit = _firstText(row, const [
+    'orderNumber',
+    'order_number',
+    'orderCode',
+    'order_code',
+    'bookingNumber',
+    'booking_number',
+    'bookingCode',
+    'booking_code',
+    'service_name',
+    'serviceName',
+    'product_name',
+    'productName',
+    'title',
+    'name'
+  ]);
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+  final items = row['items'];
+  if (items is List && items.isNotEmpty) {
+    final first = items.first;
+    if (first is Map) {
+      final itemTitle = _firstText(Map<String, dynamic>.from(first),
+          const ['title', 'name', 'productName', 'product_name']);
+      if (itemTitle.isNotEmpty) return itemTitle;
+    }
+  }
+  final customer = _firstText(row, const ['customer_name', 'customerName']);
+  if (customer.isNotEmpty && customer != 'Customer') {
+    return '$customer $activityLabel';
+  }
+  return activityLabel == 'Bookings' ? 'Service booking' : 'Customer order';
+}
+
+String _firstText(Map<String, dynamic> row, List<String> keys) {
+  for (final key in keys) {
+    final value = row[key]?.toString().trim() ?? '';
+    if (value.isNotEmpty && !_looksLikeUuid(value)) return value;
+  }
+  return '';
+}
+
+bool _looksLikeUuid(String value) => RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());
