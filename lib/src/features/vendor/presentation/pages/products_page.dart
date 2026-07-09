@@ -45,7 +45,11 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         error: (e, _) => Center(child: Text('$e')),
         data: (items) {
           final filtered = items.where((p) {
-            final matchesSearch = search.isEmpty || (p['title'] ?? '').toString().toLowerCase().contains(search.toLowerCase());
+            final matchesSearch = search.isEmpty ||
+                (p['title'] ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .contains(search.toLowerCase());
             final matchesStatus = status == 'all' || p['status'] == status;
             return matchesSearch && matchesStatus;
           }).toList();
@@ -58,7 +62,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   children: [
                     Expanded(
                       child: TextField(
-                        decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Search products...'),
+                        decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search_rounded),
+                            hintText: 'Search products...'),
                         onChanged: (v) => setState(() => search = v),
                       ),
                     ),
@@ -67,10 +73,13 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                       value: status,
                       items: const [
                         DropdownMenuItem(value: 'all', child: Text('All')),
-                        DropdownMenuItem(value: 'active', child: Text('Active')),
+                        DropdownMenuItem(
+                            value: 'active', child: Text('Active')),
                         DropdownMenuItem(value: 'draft', child: Text('Draft')),
-                        DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
-                        DropdownMenuItem(value: 'pending_approval', child: Text('Pending')),
+                        DropdownMenuItem(
+                            value: 'inactive', child: Text('Inactive')),
+                        DropdownMenuItem(
+                            value: 'pending_approval', child: Text('Pending')),
                       ],
                       onChanged: (v) => setState(() => status = v ?? 'all'),
                     ),
@@ -78,13 +87,17 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 ),
                 const SizedBox(height: 14),
                 if (filtered.isEmpty)
-                  const EmptyState(icon: Icons.inventory_2_outlined, title: 'No products found', subtitle: 'Add your first product or clear filters.')
+                  const EmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      title: 'No products found',
+                      subtitle: 'Add your first product or clear filters.')
                 else
                   ...filtered.map((p) => CatalogTile(
                         item: p,
                         fallbackIcon: Icons.inventory_2_rounded,
                         onEdit: () => _showProductForm(context, ref, item: p),
-                        onDelete: () => _delete(context, ref, p['id'].toString()),
+                        onDelete: () =>
+                            _delete(context, ref, p['id'].toString()),
                       )),
               ],
             ),
@@ -99,10 +112,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete product?'),
-        content: const Text('This removes the product from your vendor catalog.'),
+        content:
+            const Text('This removes the product from your vendor catalog.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -114,14 +132,19 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   Future<void> _importCsv(BuildContext context, WidgetRef ref) async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['csv'], withData: true);
+    final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['csv'],
+        withData: true);
     if (result == null) return;
     final bytes = result.files.single.bytes;
     if (bytes == null) return;
     final text = String.fromCharCodes(bytes);
-    final lines = text.split(RegExp(r'\r?\n')).where((l) => l.trim().isNotEmpty).toList();
+    final lines =
+        text.split(RegExp(r'\r?\n')).where((l) => l.trim().isNotEmpty).toList();
     if (lines.length < 2) return;
-    final headers = _csvSplit(lines.first).map((h) => h.trim().toLowerCase()).toList();
+    final headers =
+        _csvSplit(lines.first).map((h) => h.trim().toLowerCase()).toList();
     var imported = 0;
     for (var i = 1; i < lines.length; i++) {
       final values = _csvSplit(lines[i]);
@@ -134,7 +157,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       await ref.read(vendorRepositoryProvider).upsertProduct(vendorId, {
         'title': title,
         'description': row['description'] ?? '',
-        'short_description': row['short_description'] ?? row['description'] ?? '',
+        'short_description':
+            row['short_description'] ?? row['description'] ?? '',
         'long_description': row['long_description'] ?? row['description'] ?? '',
         'price': row['price'] ?? '0',
         'tax': row['tax'] ?? '0',
@@ -149,7 +173,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       imported++;
     }
     ref.invalidate(vendorProductsProvider);
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$imported products imported')));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$imported products imported')));
+    }
   }
 
   List<String> _csvSplit(String line) {
@@ -172,24 +199,34 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   }
 }
 
-Future<void> _showProductForm(BuildContext context, WidgetRef ref, {Map<String, dynamic>? item}) async {
+Future<void> _showProductForm(BuildContext context, WidgetRef ref,
+    {Map<String, dynamic>? item}) async {
   final vendorId = ref.read(vendorIdProvider);
   if (vendorId == null) return;
   final title = TextEditingController(text: item?['title']?.toString() ?? '');
   final sku = TextEditingController(text: item?['sku']?.toString() ?? '');
   final price = TextEditingController(text: item?['price']?.toString() ?? '');
   final tax = TextEditingController(text: item?['tax']?.toString() ?? '0');
-  final discount = TextEditingController(text: item?['discount']?.toString() ?? '0');
+  final discount =
+      TextEditingController(text: item?['discount']?.toString() ?? '0');
   final stock = TextEditingController(text: item?['stock']?.toString() ?? '');
-  final shortDescription = TextEditingController(text: item?['short_description']?.toString() ?? '');
-  final longDescription = TextEditingController(text: item?['long_description']?.toString() ?? '');
+  final shortDescription =
+      TextEditingController(text: item?['short_description']?.toString() ?? '');
+  final longDescription =
+      TextEditingController(text: item?['long_description']?.toString() ?? '');
   final image = TextEditingController(text: item?['image']?.toString() ?? '');
-  final thumbnail = TextEditingController(text: item?['thumbnail_image']?.toString() ?? '');
-  final banner = TextEditingController(text: item?['banner_image']?.toString() ?? '');
-  final youtube = TextEditingController(text: item?['youtube_video_url']?.toString() ?? '');
-  final category = TextEditingController(text: item?['category_id']?.toString() ?? '');
-  final subcategory = TextEditingController(text: item?['subcategory_id']?.toString() ?? '');
-  final parentItem = TextEditingController(text: item?['parent_item_id']?.toString() ?? '');
+  final thumbnail =
+      TextEditingController(text: item?['thumbnail_image']?.toString() ?? '');
+  final banner =
+      TextEditingController(text: item?['banner_image']?.toString() ?? '');
+  final youtube =
+      TextEditingController(text: item?['youtube_video_url']?.toString() ?? '');
+  final category =
+      TextEditingController(text: item?['category_id']?.toString() ?? '');
+  final subcategory =
+      TextEditingController(text: item?['subcategory_id']?.toString() ?? '');
+  final parentItem =
+      TextEditingController(text: item?['parent_item_id']?.toString() ?? '');
   var productType = item?['product_type']?.toString() ?? 'simple';
   var status = item?['status']?.toString() ?? 'draft';
   await showModalBottomSheet(
@@ -197,34 +234,71 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref, {Map<String, 
     isScrollControlled: true,
     showDragHandle: true,
     builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.viewInsetsOf(sheetContext).bottom + 16),
+      padding: EdgeInsets.fromLTRB(
+          16, 8, 16, MediaQuery.viewInsetsOf(sheetContext).bottom + 16),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(item == null ? 'Add Product' : 'Edit Product', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text(item == null ? 'Add Product' : 'Edit Product',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
-            TextField(controller: title, decoration: const InputDecoration(labelText: 'Title *')),
+            TextField(
+                controller: title,
+                decoration: const InputDecoration(labelText: 'Title *')),
             const SizedBox(height: 10),
-            TextField(controller: sku, decoration: const InputDecoration(labelText: 'SKU *')),
+            TextField(
+                controller: sku,
+                decoration: const InputDecoration(labelText: 'SKU *')),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: TextField(controller: price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price Rs. *'))),
+              Expanded(
+                  child: TextField(
+                      controller: price,
+                      keyboardType: TextInputType.number,
+                      decoration:
+                          const InputDecoration(labelText: 'Price Rs. *'))),
               const SizedBox(width: 10),
-              Expanded(child: TextField(controller: stock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock *'))),
+              Expanded(
+                  child: TextField(
+                      controller: stock,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Stock *'))),
             ]),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: TextField(controller: tax, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Tax'))),
+              Expanded(
+                  child: TextField(
+                      controller: tax,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Tax'))),
               const SizedBox(width: 10),
-              Expanded(child: TextField(controller: discount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Discount'))),
+              Expanded(
+                  child: TextField(
+                      controller: discount,
+                      keyboardType: TextInputType.number,
+                      decoration:
+                          const InputDecoration(labelText: 'Discount'))),
             ]),
             const SizedBox(height: 10),
-            TextField(controller: shortDescription, decoration: const InputDecoration(labelText: 'Short Description *')),
+            TextField(
+                controller: shortDescription,
+                decoration:
+                    const InputDecoration(labelText: 'Short Description *')),
             const SizedBox(height: 10),
-            TextField(controller: longDescription, minLines: 3, maxLines: 5, decoration: const InputDecoration(labelText: 'Long Description *')),
+            TextField(
+                controller: longDescription,
+                minLines: 3,
+                maxLines: 5,
+                decoration:
+                    const InputDecoration(labelText: 'Long Description *')),
             const SizedBox(height: 10),
-            TextField(controller: image, decoration: const InputDecoration(labelText: 'Image URL')),
+            TextField(
+                controller: image,
+                decoration: const InputDecoration(labelText: 'Image URL')),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () async {
@@ -236,20 +310,42 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref, {Map<String, 
             ),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: TextField(controller: category, decoration: const InputDecoration(labelText: 'Category ID'))),
+              Expanded(
+                  child: TextField(
+                      controller: category,
+                      decoration:
+                          const InputDecoration(labelText: 'Category ID'))),
               const SizedBox(width: 10),
-              Expanded(child: TextField(controller: subcategory, decoration: const InputDecoration(labelText: 'Subcategory ID'))),
+              Expanded(
+                  child: TextField(
+                      controller: subcategory,
+                      decoration:
+                          const InputDecoration(labelText: 'Subcategory ID'))),
             ]),
             const SizedBox(height: 10),
-            TextField(controller: parentItem, decoration: const InputDecoration(labelText: 'Parent Item ID')),
+            TextField(
+                controller: parentItem,
+                decoration: const InputDecoration(labelText: 'Parent Item ID')),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: TextField(controller: thumbnail, decoration: const InputDecoration(labelText: 'Thumbnail URL'))),
+              Expanded(
+                  child: TextField(
+                      controller: thumbnail,
+                      decoration:
+                          const InputDecoration(labelText: 'Thumbnail URL'))),
               const SizedBox(width: 10),
-              Expanded(child: TextField(controller: banner, decoration: const InputDecoration(labelText: 'Banner URL'))),
+              Expanded(
+                  child: TextField(
+                      controller: banner,
+                      decoration:
+                          const InputDecoration(labelText: 'Banner URL'))),
             ]),
             const SizedBox(height: 10),
-            TextField(controller: youtube, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'YouTube Video URL')),
+            TextField(
+                controller: youtube,
+                keyboardType: TextInputType.url,
+                decoration:
+                    const InputDecoration(labelText: 'YouTube Video URL')),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: productType,
@@ -275,36 +371,56 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref, {Map<String, 
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () async {
-                if (title.text.trim().isEmpty || sku.text.trim().isEmpty || price.text.trim().isEmpty || stock.text.trim().isEmpty) return;
+                if (title.text.trim().isEmpty ||
+                    sku.text.trim().isEmpty ||
+                    price.text.trim().isEmpty ||
+                    stock.text.trim().isEmpty) {
+                  return;
+                }
                 await ref.read(vendorRepositoryProvider).upsertProduct(
-                  vendorId,
-                  {
-                    'title': title.text.trim(),
-                    'sku': sku.text.trim(),
-                    'price': price.text.trim(),
-                    'tax': tax.text.trim(),
-                    'discount': discount.text.trim(),
-                    'stock': stock.text.trim(),
-                    'short_description': shortDescription.text.trim(),
-                    'long_description': longDescription.text.trim(),
-                    'description': longDescription.text.trim(),
-                    'image': image.text.trim().isEmpty ? null : image.text.trim(),
-                    'images': image.text.trim().isEmpty ? <String>[] : <String>[image.text.trim()],
-                    'thumbnail_image': thumbnail.text.trim().isEmpty ? null : thumbnail.text.trim(),
-                    'banner_image': banner.text.trim().isEmpty ? null : banner.text.trim(),
-                    'youtube_video_url': youtube.text.trim(),
-                    'category_id': category.text.trim().isEmpty ? null : category.text.trim(),
-                    'subcategory_id': subcategory.text.trim().isEmpty ? null : subcategory.text.trim(),
-                    'parent_item_id': parentItem.text.trim().isEmpty ? null : parentItem.text.trim(),
-                    'product_type': productType,
-                    'status': item == null ? 'pending_approval' : status,
-                  },
-                  id: item?['id']?.toString(),
-                );
+                      vendorId,
+                      {
+                        'title': title.text.trim(),
+                        'sku': sku.text.trim(),
+                        'price': price.text.trim(),
+                        'tax': tax.text.trim(),
+                        'discount': discount.text.trim(),
+                        'stock': stock.text.trim(),
+                        'short_description': shortDescription.text.trim(),
+                        'long_description': longDescription.text.trim(),
+                        'description': longDescription.text.trim(),
+                        'image': image.text.trim().isEmpty
+                            ? null
+                            : image.text.trim(),
+                        'images': image.text.trim().isEmpty
+                            ? <String>[]
+                            : <String>[image.text.trim()],
+                        'thumbnail_image': thumbnail.text.trim().isEmpty
+                            ? null
+                            : thumbnail.text.trim(),
+                        'banner_image': banner.text.trim().isEmpty
+                            ? null
+                            : banner.text.trim(),
+                        'youtube_video_url': youtube.text.trim(),
+                        'category_id': category.text.trim().isEmpty
+                            ? null
+                            : category.text.trim(),
+                        'subcategory_id': subcategory.text.trim().isEmpty
+                            ? null
+                            : subcategory.text.trim(),
+                        'parent_item_id': parentItem.text.trim().isEmpty
+                            ? null
+                            : parentItem.text.trim(),
+                        'product_type': productType,
+                        'status': item == null ? 'pending_approval' : status,
+                      },
+                      id: item?['id']?.toString(),
+                    );
                 ref.invalidate(vendorProductsProvider);
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
               },
-              child: Text(item == null ? 'Submit for Approval' : 'Update Product'),
+              child:
+                  Text(item == null ? 'Submit for Approval' : 'Update Product'),
             ),
           ],
         ),
@@ -313,8 +429,10 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref, {Map<String, 
   );
 }
 
-Future<String?> pickVendorImage(WidgetRef ref, String vendorId, String folder) async {
-  final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82);
+Future<String?> pickVendorImage(
+    WidgetRef ref, String vendorId, String folder) async {
+  final picked = await ImagePicker()
+      .pickImage(source: ImageSource.gallery, imageQuality: 82);
   if (picked == null) return null;
   return ref.read(vendorRepositoryProvider).uploadVendorAsset(
         vendorId,
@@ -326,7 +444,12 @@ Future<String?> pickVendorImage(WidgetRef ref, String vendorId, String folder) a
 }
 
 class CatalogTile extends StatelessWidget {
-  const CatalogTile({required this.item, required this.fallbackIcon, required this.onEdit, required this.onDelete, super.key});
+  const CatalogTile(
+      {required this.item,
+      required this.fallbackIcon,
+      required this.onEdit,
+      required this.onDelete,
+      super.key});
   final Map<String, dynamic> item;
   final IconData fallbackIcon;
   final VoidCallback onEdit;
@@ -334,7 +457,8 @@ class CatalogTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currency = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.', decimalDigits: 0);
+    final currency =
+        NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.', decimalDigits: 0);
     final image = item['image']?.toString();
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -347,7 +471,11 @@ class CatalogTile extends StatelessWidget {
                 width: 58,
                 height: 58,
                 color: Colors.black.withValues(alpha: .04),
-                child: image != null && image.isNotEmpty ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(fallbackIcon)) : Icon(fallbackIcon),
+                child: image != null && image.isNotEmpty
+                    ? Image.network(image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(fallbackIcon))
+                    : Icon(fallbackIcon),
               ),
             ),
             const SizedBox(width: 12),
@@ -356,11 +484,19 @@ class CatalogTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Expanded(child: Text(item['title']?.toString() ?? 'Untitled', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))),
+                    Expanded(
+                        child: Text(item['title']?.toString() ?? 'Untitled',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w800))),
                     StatusBadge(item['status']?.toString() ?? 'draft'),
                   ]),
                   const SizedBox(height: 5),
-                  Text('${currency.format(item['price'] ?? 0)}  -  Stock: ${item['stock'] ?? 0}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                  Text(
+                      '${currency.format(item['price'] ?? 0)}  -  Stock: ${item['stock'] ?? 0}',
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.black54)),
                 ],
               ),
             ),

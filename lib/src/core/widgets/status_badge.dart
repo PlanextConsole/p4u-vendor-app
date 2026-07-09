@@ -10,10 +10,25 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      'active' || 'verified' || 'settled' || 'completed' || 'delivered' => AppColors.success,
-      'pending' || 'pending_approval' || 'eligible' || 'in_progress' || 'offline_pending' => AppColors.warning,
+      'active' ||
+      'verified' ||
+      'settled' ||
+      'completed' ||
+      'delivered' =>
+        AppColors.success,
+      'pending' ||
+      'pending_approval' ||
+      'eligible' ||
+      'in_progress' ||
+      'offline_pending' =>
+        AppColors.warning,
       'paid' || 'accepted' || 'confirmed' || 'shipped' => AppColors.info,
-      'cancelled' || 'rejected' || 'inactive' || 'on_hold' || 'deleted' => AppColors.danger,
+      'cancelled' ||
+      'rejected' ||
+      'inactive' ||
+      'on_hold' ||
+      'deleted' =>
+        AppColors.danger,
       _ => AppColors.muted,
     };
     return Container(
@@ -24,7 +39,8 @@ class StatusBadge extends StatelessWidget {
       ),
       child: Text(
         status.replaceAll('_', ' '),
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+        style:
+            TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
       ),
     );
   }

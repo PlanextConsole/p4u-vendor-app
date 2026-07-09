@@ -15,7 +15,8 @@ class VendorUser {
   final String? supabaseUid;
   final String? status;
 
-  factory VendorUser.fromRole(Map<String, dynamic> role, Map<String, dynamic>? vendor, String uid, String fallbackEmail) {
+  factory VendorUser.fromRole(Map<String, dynamic> role,
+      Map<String, dynamic>? vendor, String uid, String fallbackEmail) {
     return VendorUser(
       id: (role['vendor_id'] ?? vendor?['id'] ?? '').toString(),
       name: (vendor?['name'] ?? '').toString(),
@@ -26,13 +27,26 @@ class VendorUser {
     );
   }
 
-  factory VendorUser.fromApi(Map<String, dynamic> vendor, {String? fallbackId, String? userId}) {
-    final id = (vendor['id'] ?? vendor['vendorId'] ?? vendor['vendor_id'] ?? fallbackId ?? '').toString();
+  factory VendorUser.fromApi(Map<String, dynamic> vendor,
+      {String? fallbackId, String? userId}) {
+    final id = (vendor['id'] ??
+            vendor['vendorId'] ??
+            vendor['vendor_id'] ??
+            fallbackId ??
+            '')
+        .toString();
     return VendorUser(
       id: id,
-      name: (vendor['ownerName'] ?? vendor['owner_name'] ?? vendor['name'] ?? '').toString(),
+      name:
+          (vendor['ownerName'] ?? vendor['owner_name'] ?? vendor['name'] ?? '')
+              .toString(),
       email: (vendor['email'] ?? '').toString(),
-      businessName: (vendor['businessName'] ?? vendor['business_name'] ?? vendor['storeName'] ?? vendor['store_name'] ?? '').toString(),
+      businessName: (vendor['businessName'] ??
+              vendor['business_name'] ??
+              vendor['storeName'] ??
+              vendor['store_name'] ??
+              '')
+          .toString(),
       supabaseUid: userId,
       status: vendor['status']?.toString(),
     );

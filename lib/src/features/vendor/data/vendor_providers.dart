@@ -63,3 +63,9 @@ final vendorBanksProvider = FutureProvider.autoDispose((ref) async {
   if (vendorId == null) return <Map<String, dynamic>>[];
   return ref.watch(vendorRepositoryProvider).bankAccounts(vendorId);
 });
+
+final vendorNotificationsProvider = FutureProvider.autoDispose((ref) async {
+  final vendorId = ref.watch(vendorIdProvider);
+  if (vendorId == null) return <Map<String, dynamic>>[];
+  return ref.watch(vendorRepositoryProvider).notifications(vendorId);
+});

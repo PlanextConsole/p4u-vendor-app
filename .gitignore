@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Local Gradle/Android build output from path dependencies
+**/.gradle/
+**/gradle-wrapper.jar
+**/gradlew
+**/gradlew.bat
+**/.kotlin/

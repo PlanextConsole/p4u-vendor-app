@@ -79,19 +79,25 @@ class _VendorDrawer extends ConsumerWidget {
       const _Destination('Dashboard', '/', Icons.dashboard_rounded),
       const _Destination('Products', '/products', Icons.inventory_2_rounded),
       const _Destination('Services', '/services', Icons.handyman_rounded),
-      const _Destination('Availability', '/availability', Icons.calendar_month_rounded),
+      const _Destination(
+          'Availability', '/availability', Icons.calendar_month_rounded),
       const _Destination('Orders', '/orders', Icons.shopping_cart_rounded),
-      const _Destination('Bookings', '/bookings', Icons.event_available_rounded),
-      const _Destination('Settlements', '/settlements', Icons.currency_rupee_rounded),
+      const _Destination(
+          'Bookings', '/bookings', Icons.event_available_rounded),
+      const _Destination(
+          'Settlements', '/settlements', Icons.currency_rupee_rounded),
       const _Destination('Payment History', '/payments', Icons.history_rounded),
-      const _Destination('Wallet', '/wallet', Icons.account_balance_wallet_rounded),
-      const _Destination('Bank Account', '/bank', Icons.account_balance_rounded),
+      const _Destination(
+          'Wallet', '/wallet', Icons.account_balance_wallet_rounded),
+      const _Destination(
+          'Bank Account', '/bank', Icons.account_balance_rounded),
       const _Destination('Media Library', '/media', Icons.perm_media_rounded),
       const _Destination('Analytics', '/analytics', Icons.bar_chart_rounded),
       const _Destination('Reviews', '/reviews', Icons.star_rounded),
       const _Destination('Support', '/support', Icons.help_outline_rounded),
       const _Destination('Settings', '/settings', Icons.settings_rounded),
-      const _Destination('Account Control', '/account-control', Icons.admin_panel_settings_rounded),
+      const _Destination('Account Control', '/account-control',
+          Icons.admin_panel_settings_rounded),
     ];
     return Drawer(
       child: SafeArea(
@@ -106,21 +112,28 @@ class _VendorDrawer extends ConsumerWidget {
                   const CircleAvatar(
                     radius: 24,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.storefront_rounded, color: AppColors.primary),
+                    child: Icon(Icons.storefront_rounded,
+                        color: AppColors.primary),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(vendor?.businessName.isNotEmpty == true ? vendor!.businessName : 'Vendor Portal',
+                        Text(
+                            vendor?.businessName.isNotEmpty == true
+                                ? vendor!.businessName
+                                : 'Vendor Portal',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800)),
                         Text(vendor?.name ?? 'Seller Dashboard',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -145,8 +158,10 @@ class _VendorDrawer extends ConsumerWidget {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.logout_rounded, color: AppColors.danger),
-              title: const Text('Logout', style: TextStyle(color: AppColors.danger)),
+              leading:
+                  const Icon(Icons.logout_rounded, color: AppColors.danger),
+              title: const Text('Logout',
+                  style: TextStyle(color: AppColors.danger)),
               onTap: () async {
                 await ref.read(authRepositoryProvider).signOut();
                 if (context.mounted) context.go('/login');

@@ -19,7 +19,11 @@ class PaymentsPage extends ConsumerWidget {
         data: (items) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Search by ID or order ID...'), onChanged: (_) {}),
+            TextField(
+                decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search_rounded),
+                    hintText: 'Search by ID or order ID...'),
+                onChanged: (_) {}),
             const SizedBox(height: 16),
             ...items.map((row) => SettlementTile(row)),
           ],

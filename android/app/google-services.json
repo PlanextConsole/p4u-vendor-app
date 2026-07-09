@@ -7,14 +7,30 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:784503032650:android:9f04cccd93da071b028fb3",
+        "mobilesdk_app_id": "1:784503032650:android:406ffb42a7e723cf028fb3",
         "android_client_info": {
-          "package_name": "com.p4u_customer"
+          "package_name": "com.otptestapplication"
         }
       },
       "oauth_client": [
         {
-          "client_id": "784503032650-placeholder.apps.googleusercontent.com",
+          "client_id": "784503032650-q7fp4tuu1ijncdgh6h9374mnudffumsn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.otptestapplication",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "784503032650-tv5ll9ipr9jbos91jf3t855rrql236nm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.otptestapplication",
+            "certificate_hash": "e5ef0fff395d10d235478e95e1ccfcc50d5b4498"
+          }
+        },
+        {
+          "client_id": "784503032650-kjb4r6tdsqvvub0hj9ofvf0crco041cm.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -27,8 +43,16 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "784503032650-placeholder.apps.googleusercontent.com",
+              "client_id": "784503032650-2ashaik0chkcgdn8k7vlmr90fn2btna6.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "784503032650-qraridlofldvo6e5l3ee673dqa7hd3cp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.planext4u.p4uuser",
+                "app_store_id": "6738922968"
+              }
             }
           ]
         }
@@ -43,7 +67,63 @@
       },
       "oauth_client": [
         {
-          "client_id": "784503032650-placeholder.apps.googleusercontent.com",
+          "client_id": "784503032650-6ev2q1bj7q0ucr67ih4057m04n5nsolp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "5ebc9241560220baa5e6e5f575d13980c48f40fc"
+          }
+        },
+        {
+          "client_id": "784503032650-7a63es68v9lvtbrvtdtgqp2ln79dhugo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "5517becb8cc5eb3222e040de608384cb9b7676f7"
+          }
+        },
+        {
+          "client_id": "784503032650-c4kq6j0ea0oleg5hlhm16eomckq19e42.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "784503032650-d4vkr7bhfqlssv9a2j4g9pti1q170pq7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "b1846f23e496f4fd382f7811dda6690b971e8567"
+          }
+        },
+        {
+          "client_id": "784503032650-lh3kg1h5293b9kdr52o3u235hvc0u6ap.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "17878a4a77f94d02511dbd368b7b02254f287221"
+          }
+        },
+        {
+          "client_id": "784503032650-nd55uh1iqn5s818r8if52t4ngsss2jns.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "3f85d99f6d2a240b37bbc986998f990c82c00951"
+          }
+        },
+        {
+          "client_id": "784503032650-s2qj521b05al8is21adldrt2i73poj86.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u.p4u_vendor",
+            "certificate_hash": "9b8cd5b80cda15297366fe7127ba6482a5d5b742"
+          }
+        },
+        {
+          "client_id": "784503032650-kjb4r6tdsqvvub0hj9ofvf0crco041cm.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -56,8 +136,16 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "784503032650-placeholder.apps.googleusercontent.com",
+              "client_id": "784503032650-2ashaik0chkcgdn8k7vlmr90fn2btna6.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "784503032650-qraridlofldvo6e5l3ee673dqa7hd3cp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.planext4u.p4uuser",
+                "app_store_id": "6738922968"
+              }
             }
           ]
         }
@@ -65,14 +153,54 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:784503032650:android:406ffb42a7e723cf028fb3",
+        "mobilesdk_app_id": "1:784503032650:android:9f04cccd93da071b028fb3",
         "android_client_info": {
-          "package_name": "com.otptestapplication"
+          "package_name": "com.p4u_customer"
         }
       },
       "oauth_client": [
         {
-          "client_id": "784503032650-placeholder.apps.googleusercontent.com",
+          "client_id": "784503032650-1omtfbhp2880do4bk1qvhpgnc06bvaig.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u_customer",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "784503032650-5ba0s5rl4ur2mm1rm788l8gq3gq76gom.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u_customer",
+            "certificate_hash": "f3c0637e7778b01ae276aa551fe2234797f618ce"
+          }
+        },
+        {
+          "client_id": "784503032650-djedpsrf20gro2hojt6ovv4je02660kb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u_customer",
+            "certificate_hash": "650347b3b29749401f3cab26b904b119c2617e31"
+          }
+        },
+        {
+          "client_id": "784503032650-qqrrnakkko93bp2kako8n8u83qcofvv0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u_customer",
+            "certificate_hash": "5ebc9241560220baa5e6e5f575d13980c48f40fc"
+          }
+        },
+        {
+          "client_id": "784503032650-thgvibt2f36b9icfn2cclqbl8kteupbg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.p4u_customer",
+            "certificate_hash": "17878a4a77f94d02511dbd368b7b02254f287221"
+          }
+        },
+        {
+          "client_id": "784503032650-kjb4r6tdsqvvub0hj9ofvf0crco041cm.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -85,8 +213,16 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "784503032650-placeholder.apps.googleusercontent.com",
+              "client_id": "784503032650-2ashaik0chkcgdn8k7vlmr90fn2btna6.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "784503032650-qraridlofldvo6e5l3ee673dqa7hd3cp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.planext4u.p4uuser",
+                "app_store_id": "6738922968"
+              }
             }
           ]
         }

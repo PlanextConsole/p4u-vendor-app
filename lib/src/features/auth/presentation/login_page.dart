@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/auth_repository.dart';
 
@@ -25,8 +26,6 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
   bool _passwordMode = false;
   String? _verificationId;
 
-  bool get _useDemoPhoneLogin => false;
-
   Future<void> _submit() async {
     if (_email.text.trim().isEmpty || _password.text.isEmpty) {
       _snack('Please enter email and password');
@@ -34,21 +33,15 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
     }
     setState(() => _loading = true);
     try {
-      await ref.read(authRepositoryProvider).signInWithPassword(_email.text.trim(), _password.text);
+      await ref
+          .read(authRepositoryProvider)
+          .signInWithPassword(_email.text.trim(), _password.text);
       if (mounted) context.go('/');
     } catch (e) {
-      _snack(e.toString().replaceFirst('AuthException(message: ', '').replaceFirst(', statusCode: null)', ''));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _demoLogin() async {
-    setState(() => _loading = true);
-    try {
-      await ref.read(authRepositoryProvider).signInWithDemo();
-      ref.invalidate(authStateProvider);
-      if (mounted) context.go('/');
+      _snack(e
+          .toString()
+          .replaceFirst('AuthException(message: ', '')
+          .replaceFirst(', statusCode: null)', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -60,12 +53,10 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
       _snack('Please enter a valid 10-digit phone number');
       return;
     }
-    if (_useDemoPhoneLogin) {
-      await _demoLogin();
-      return;
-    }
     if (Firebase.apps.isEmpty) {
-      _snack('Firebase is not configured for this native app yet.');
+      _snack(
+        'Firebase is not configured. Add SHA fingerprints in Firebase Console and replace android/app/google-services.json, then rebuild the app.',
+      );
       return;
     }
     setState(() => _loading = true);
@@ -78,7 +69,7 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
         verificationFailed: (error) {
           if (mounted) {
             setState(() => _loading = false);
-            _snack(error.message ?? 'OTP failed. Please try again.');
+            _snack(_friendly(error));
           }
         },
         codeSent: (verificationId, _) {
@@ -90,7 +81,8 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
             });
           }
         },
-        codeAutoRetrievalTimeout: (verificationId) => _verificationId = verificationId,
+        codeAutoRetrievalTimeout: (verificationId) =>
+            _verificationId = verificationId,
       );
     } catch (e) {
       _snack('$e');
@@ -111,21 +103,51 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
       );
       await _signInWithCredential(credential);
     } catch (e) {
-      _snack('Invalid OTP. Please try again.');
+      _snack(_friendly(e));
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _signInWithCredential(firebase.PhoneAuthCredential credential) async {
-    final userCredential = await firebase.FirebaseAuth.instance.signInWithCredential(credential);
-    final token = await userCredential.user?.getIdToken();
-    if (token == null) throw StateError('Missing Firebase ID token');
-    await ref.read(authRepositoryProvider).signInWithFirebaseIdToken(token);
-    if (mounted) context.go('/');
+  Future<void> _signInWithCredential(
+      firebase.PhoneAuthCredential credential) async {
+    final auth = firebase.FirebaseAuth.instance;
+    try {
+      final userCredential = await auth.signInWithCredential(credential);
+      final token = await userCredential.user?.getIdToken(true);
+      if (token == null) throw StateError('Missing Firebase ID token');
+      await ref.read(authRepositoryProvider).signInWithFirebaseIdToken(token);
+      ref.invalidate(authStateProvider);
+      if (mounted) context.go('/');
+    } catch (e) {
+      _snack(_friendly(e));
+    } finally {
+      await auth.signOut().catchError((_) {});
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _friendly(Object e) {
+    if (e is ApiException) return e.message;
+    if (e is firebase.FirebaseAuthException) {
+      if (e.code == 'invalid-verification-code') {
+        return 'Incorrect OTP. Please try again.';
+      }
+      if (e.code == 'session-expired' || e.code == 'code-expired') {
+        return 'OTP expired. Please request a new code.';
+      }
+      final message = e.message ?? '';
+      if (e.code == 'app-not-authorized' ||
+          message.toLowerCase().contains('missing a valid app identifier')) {
+        return 'Firebase phone OTP is not authorized for this APK. Add this app package and SHA-1/SHA-256 fingerprints in Firebase Console, download google-services.json, then rebuild.';
+      }
+      return message.isNotEmpty ? message : 'OTP failed. Please try again.';
+    }
+    return e.toString().replaceFirst('Exception: ', '');
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _modeSwitch() {
@@ -139,8 +161,16 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
       ),
       child: Row(
         children: [
-          _modeButton(label: 'Phone OTP', icon: Icons.phone_rounded, selected: !_passwordMode, onTap: () => _setMode(false)),
-          _modeButton(label: 'Password', icon: Icons.mail_outline_rounded, selected: _passwordMode, onTap: () => _setMode(true)),
+          _modeButton(
+              label: 'Phone OTP',
+              icon: Icons.phone_rounded,
+              selected: !_passwordMode,
+              onTap: () => _setMode(false)),
+          _modeButton(
+              label: 'Password',
+              icon: Icons.mail_outline_rounded,
+              selected: _passwordMode,
+              onTap: () => _setMode(true)),
         ],
       ),
     );
@@ -167,7 +197,8 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(selected ? Icons.check_rounded : icon, size: 18, color: AppColors.brandDark),
+              Icon(selected ? Icons.check_rounded : icon,
+                  size: 18, color: AppColors.brandDark),
               const SizedBox(width: 6),
               Flexible(
                 child: FittedBox(
@@ -176,7 +207,8 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                     label,
                     maxLines: 1,
                     softWrap: false,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -218,7 +250,8 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                 child: Card(
                   elevation: 16,
                   shadowColor: AppColors.brandDark.withValues(alpha: .14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24)),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -227,7 +260,10 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(28),
                         decoration: const BoxDecoration(
-                          gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+                          gradient: LinearGradient(colors: [
+                            AppColors.primary,
+                            AppColors.primaryDark
+                          ]),
                         ),
                         child: Column(
                           children: [
@@ -256,13 +292,21 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                             const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.store_rounded, color: Colors.white70, size: 20),
+                                Icon(Icons.store_rounded,
+                                    color: Colors.white70, size: 20),
                                 SizedBox(width: 8),
-                                Text('Vendor Portal', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                                Text('Vendor Portal',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800)),
                               ],
                             ),
                             const SizedBox(height: 4),
-                            const Text('Manage your store, orders & settlements', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            const Text(
+                                'Manage your store, orders & settlements',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -276,18 +320,25 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                               TextField(
                                 controller: _email,
                                 keyboardType: TextInputType.emailAddress,
-                                decoration: const InputDecoration(prefixIcon: Icon(Icons.mail_outline_rounded), hintText: 'Vendor Email'),
+                                decoration: const InputDecoration(
+                                    prefixIcon:
+                                        Icon(Icons.mail_outline_rounded),
+                                    hintText: 'Vendor Email'),
                               ),
                               const SizedBox(height: 14),
                               TextField(
                                 controller: _password,
                                 obscureText: !_showPassword,
                                 decoration: InputDecoration(
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                  prefixIcon:
+                                      const Icon(Icons.lock_outline_rounded),
                                   hintText: 'Password',
                                   suffixIcon: IconButton(
-                                    onPressed: () => setState(() => _showPassword = !_showPassword),
-                                    icon: Icon(_showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                                    onPressed: () => setState(
+                                        () => _showPassword = !_showPassword),
+                                    icon: Icon(_showPassword
+                                        ? Icons.visibility_off_rounded
+                                        : Icons.visibility_rounded),
                                   ),
                                 ),
                                 onSubmitted: (_) => _submit(),
@@ -298,39 +349,62 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                                 keyboardType: TextInputType.phone,
                                 maxLength: 10,
                                 onChanged: (_) => setState(() {}),
-                                decoration: const InputDecoration(prefixIcon: Icon(Icons.phone_rounded), prefixText: '+91 ', hintText: 'Phone number', counterText: ''),
+                                decoration: const InputDecoration(
+                                    prefixIcon: Icon(Icons.phone_rounded),
+                                    prefixText: '+91 ',
+                                    hintText: 'Phone number',
+                                    counterText: ''),
                               ),
                             ] else ...[
-                              Text('Enter OTP sent to +91 ${_phone.text}', style: const TextStyle(color: Colors.black54)),
+                              Text('Enter OTP sent to +91 ${_phone.text}',
+                                  style:
+                                      const TextStyle(color: Colors.black54)),
                               const SizedBox(height: 10),
                               TextField(
                                 controller: _otp,
                                 keyboardType: TextInputType.number,
                                 maxLength: 6,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 8),
-                                decoration: const InputDecoration(hintText: '000000', counterText: ''),
+                                style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 8),
+                                decoration: const InputDecoration(
+                                    hintText: '000000', counterText: ''),
                               ),
                             ],
                             const SizedBox(height: 18),
                             FilledButton.icon(
-                              onPressed: _loading ? null : (_passwordMode ? _submit : (_otpSent ? _verifyOtp : _sendOtp)),
+                              onPressed: _loading
+                                  ? null
+                                  : (_passwordMode
+                                      ? _submit
+                                      : (_otpSent ? _verifyOtp : _sendOtp)),
                               icon: _loading
-                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : Icon(_passwordMode ? Icons.login_rounded : (_otpSent ? Icons.verified_user_rounded : Icons.arrow_forward_rounded)),
-                              label: Text(_loading ? 'Please wait...' : (_passwordMode ? 'Sign In' : (_otpSent ? 'Verify OTP' : 'Send OTP'))),
-                              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white))
+                                  : Icon(_passwordMode
+                                      ? Icons.login_rounded
+                                      : (_otpSent
+                                          ? Icons.verified_user_rounded
+                                          : Icons.arrow_forward_rounded)),
+                              label: Text(_loading
+                                  ? 'Please wait...'
+                                  : (_passwordMode
+                                      ? 'Sign In'
+                                      : (_otpSent
+                                          ? 'Verify OTP'
+                                          : 'Send OTP'))),
+                              style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52)),
                             ),
                             const SizedBox(height: 14),
                             TextButton(
                               onPressed: () => context.go('/register'),
                               child: const Text('New vendor? Register here'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: _loading ? null : _demoLogin,
-                              icon: const Icon(Icons.storefront_rounded),
-                              label: const Text('Continue with dummy login'),
-                              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
                             ),
                           ],
                         ),

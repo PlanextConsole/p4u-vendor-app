@@ -31,29 +31,50 @@ class ProfilePage extends ConsumerWidget {
               height: 150,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
-                gradient: const LinearGradient(colors: [Color(0x33009999), Color(0x11009999)]),
-                image: vendor['background_image'] != null ? DecorationImage(image: NetworkImage(vendor['background_image']), fit: BoxFit.cover) : null,
+                gradient: const LinearGradient(
+                    colors: [Color(0x33009999), Color(0x11009999)]),
+                image: vendor['background_image'] != null
+                    ? DecorationImage(
+                        image: NetworkImage(vendor['background_image']),
+                        fit: BoxFit.cover)
+                    : null,
               ),
               alignment: Alignment.bottomRight,
               padding: const EdgeInsets.all(12),
-              child: FilledButton.icon(onPressed: () => _uploadCover(context, ref), icon: const Icon(Icons.image_rounded), label: const Text('Change Cover')),
+              child: FilledButton.icon(
+                  onPressed: () => _uploadCover(context, ref),
+                  icon: const Icon(Icons.image_rounded),
+                  label: const Text('Change Cover')),
             ),
             Transform.translate(
               offset: const Offset(0, -24),
               child: AppCard(
                 child: Row(
                   children: [
-                    const CircleAvatar(radius: 34, backgroundColor: AppColors.accent, child: Icon(Icons.storefront_rounded, size: 34, color: AppColors.primary)),
+                    const CircleAvatar(
+                        radius: 34,
+                        backgroundColor: AppColors.accent,
+                        child: Icon(Icons.storefront_rounded,
+                            size: 34, color: AppColors.primary)),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(children: [
-                            Expanded(child: Text(vendor['business_name']?.toString() ?? 'Business', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
-                            StatusBadge(vendor['status']?.toString() ?? 'pending'),
+                            Expanded(
+                                child: Text(
+                                    vendor['business_name']?.toString() ??
+                                        'Business',
+                                    style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900))),
+                            StatusBadge(
+                                vendor['status']?.toString() ?? 'pending'),
                           ]),
-                          Text('${vendor['name'] ?? ''} - Category ${vendor['category_id'] ?? ''}', style: const TextStyle(color: Colors.black54)),
+                          Text(
+                              '${vendor['name'] ?? ''} - Category ${vendor['category_id'] ?? ''}',
+                              style: const TextStyle(color: Colors.black54)),
                         ],
                       ),
                     ),
@@ -66,13 +87,23 @@ class ProfilePage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    const Expanded(child: Text('Business Details', style: TextStyle(fontWeight: FontWeight.w800))),
-                    TextButton.icon(onPressed: () => _editProfile(context, ref, vendor), icon: const Icon(Icons.edit_rounded), label: const Text('Edit')),
+                    const Expanded(
+                        child: Text('Business Details',
+                            style: TextStyle(fontWeight: FontWeight.w800))),
+                    TextButton.icon(
+                        onPressed: () => _editProfile(context, ref, vendor),
+                        icon: const Icon(Icons.edit_rounded),
+                        label: const Text('Edit')),
                   ]),
                   _Detail(Icons.mail_outline_rounded, 'Email', vendor['email']),
                   _Detail(Icons.phone_rounded, 'Phone', vendor['mobile']),
-                  _Detail(Icons.location_on_outlined, 'Location', vendor['shop_address'] ?? 'Area ${vendor['area_id']}, City ${vendor['city_id']}'),
-                  _Detail(Icons.verified_user_outlined, 'Commission Rate', '${vendor['commission_rate'] ?? 0}%'),
+                  _Detail(
+                      Icons.location_on_outlined,
+                      'Location',
+                      vendor['shop_address'] ??
+                          'Area ${vendor['area_id']}, City ${vendor['city_id']}'),
+                  _Detail(Icons.verified_user_outlined, 'Commission Rate',
+                      '${vendor['commission_rate'] ?? 0}%'),
                 ],
               ),
             ),
@@ -81,20 +112,30 @@ class ProfilePage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Plan & Payment', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const Text('Plan & Payment',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.workspace_premium_rounded, color: AppColors.primary),
+                      const Icon(Icons.workspace_premium_rounded,
+                          color: AppColors.primary),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(vendor['membership']?.toString() == 'premium' ? 'Premium Plan' : 'Basic Plan')),
-                      StatusBadge(vendor['plan_payment_status']?.toString() ?? 'unpaid'),
+                      Expanded(
+                          child: Text(
+                              vendor['membership']?.toString() == 'premium'
+                                  ? 'Premium Plan'
+                                  : 'Basic Plan')),
+                      StatusBadge(vendor['plan_payment_status']?.toString() ??
+                          'unpaid'),
                     ],
                   ),
                   if (vendor['plan_transaction_id'] != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text('Transaction ID: ${vendor['plan_transaction_id']}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                      child: Text(
+                          'Transaction ID: ${vendor['plan_transaction_id']}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.black54)),
                     ),
                 ],
               ),
@@ -108,9 +149,20 @@ class ProfilePage extends ConsumerWidget {
                 crossAxisSpacing: 10,
                 childAspectRatio: 1.05,
                 children: [
-                  MetricCard(icon: Icons.inventory_2_rounded, label: 'Products', value: '${d.products.length}'),
-                  MetricCard(icon: Icons.shopping_cart_rounded, label: 'Orders', value: '${d.orders.length}'),
-                  MetricCard(icon: Icons.currency_rupee_rounded, label: 'Revenue', value: NumberFormat.compactCurrency(locale: 'en_IN', symbol: 'Rs.').format(d.revenue)),
+                  MetricCard(
+                      icon: Icons.inventory_2_rounded,
+                      label: 'Products',
+                      value: '${d.products.length}'),
+                  MetricCard(
+                      icon: Icons.shopping_cart_rounded,
+                      label: 'Orders',
+                      value: '${d.orders.length}'),
+                  MetricCard(
+                      icon: Icons.currency_rupee_rounded,
+                      label: 'Revenue',
+                      value: NumberFormat.compactCurrency(
+                              locale: 'en_IN', symbol: 'Rs.')
+                          .format(d.revenue)),
                 ],
               ),
               orElse: () => const SizedBox.shrink(),
@@ -121,30 +173,47 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Future<void> _editProfile(BuildContext context, WidgetRef ref, Map<String, dynamic> vendor) async {
+  Future<void> _editProfile(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> vendor) async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    final email = TextEditingController(text: vendor['email']?.toString() ?? '');
-    final mobile = TextEditingController(text: vendor['mobile']?.toString() ?? '');
-    final address = TextEditingController(text: vendor['shop_address']?.toString() ?? '');
+    final email =
+        TextEditingController(text: vendor['email']?.toString() ?? '');
+    final mobile =
+        TextEditingController(text: vendor['mobile']?.toString() ?? '');
+    final address =
+        TextEditingController(text: vendor['shop_address']?.toString() ?? '');
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.viewInsetsOf(sheetContext).bottom + 16),
+        padding: EdgeInsets.fromLTRB(
+            16, 8, 16, MediaQuery.viewInsetsOf(sheetContext).bottom + 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: email, decoration: const InputDecoration(labelText: 'Email')),
+            TextField(
+                controller: email,
+                decoration: const InputDecoration(labelText: 'Email')),
             const SizedBox(height: 10),
-            TextField(controller: mobile, decoration: const InputDecoration(labelText: 'Phone')),
+            TextField(
+                controller: mobile,
+                decoration: const InputDecoration(labelText: 'Phone')),
             const SizedBox(height: 10),
-            TextField(controller: address, decoration: const InputDecoration(labelText: 'Shop Address')),
+            TextField(
+                controller: address,
+                decoration: const InputDecoration(labelText: 'Shop Address')),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () async {
-                await ref.read(vendorRepositoryProvider).updateProfile(vendorId, {'email': email.text.trim(), 'mobile': mobile.text.trim(), 'shop_address': address.text.trim()});
+                await ref
+                    .read(vendorRepositoryProvider)
+                    .updateProfile(vendorId, {
+                  'email': email.text.trim(),
+                  'mobile': mobile.text.trim(),
+                  'shop_address': address.text.trim()
+                });
                 ref.invalidate(vendorProfileProvider);
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
               },
@@ -159,7 +228,8 @@ class ProfilePage extends ConsumerWidget {
   Future<void> _uploadCover(BuildContext context, WidgetRef ref) async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82);
+    final picked = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, imageQuality: 82);
     if (picked == null) return;
     final url = await ref.read(vendorRepositoryProvider).uploadVendorAsset(
           vendorId,
@@ -168,9 +238,14 @@ class ProfilePage extends ConsumerWidget {
           picked.name,
           picked.mimeType ?? 'image/jpeg',
         );
-    await ref.read(vendorRepositoryProvider).updateProfile(vendorId, {'background_image': url});
+    await ref
+        .read(vendorRepositoryProvider)
+        .updateProfile(vendorId, {'background_image': url});
     ref.invalidate(vendorProfileProvider);
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cover image updated')));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Cover image updated')));
+    }
   }
 }
 
@@ -189,9 +264,12 @@ class _Detail extends StatelessWidget {
           Icon(icon, size: 18, color: Colors.black45),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-              Text(value?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: const TextStyle(fontSize: 11, color: Colors.black54)),
+              Text(value?.toString() ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
             ]),
           ),
         ],

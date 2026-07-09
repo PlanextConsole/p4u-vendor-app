@@ -13,24 +13,56 @@ class AvailabilityPage extends ConsumerStatefulWidget {
 }
 
 class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
-  static const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  static const times = ['06:00 AM', '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM'];
+  static const days = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday'
+  ];
+  static const times = [
+    '06:00 AM',
+    '07:00 AM',
+    '08:00 AM',
+    '09:00 AM',
+    '10:00 AM',
+    '11:00 AM',
+    '12:00 PM',
+    '01:00 PM',
+    '02:00 PM',
+    '03:00 PM',
+    '04:00 PM',
+    '05:00 PM',
+    '06:00 PM',
+    '07:00 PM',
+    '08:00 PM',
+    '09:00 PM'
+  ];
 
   late List<Map<String, dynamic>> schedule = _defaults();
   bool loaded = false;
   bool changed = false;
 
-  List<Map<String, dynamic>> _defaults() => List.generate(7, (i) => {
-        'day_of_week': i,
-        'is_available': i >= 1 && i <= 6,
-        'time_slots': i >= 1 && i <= 6 ? [{'start': '09:00 AM', 'end': '06:00 PM'}] : [],
-      });
+  List<Map<String, dynamic>> _defaults() => List.generate(
+      7,
+      (i) => {
+            'day_of_week': i,
+            'is_available': i >= 1 && i <= 6,
+            'time_slots': i >= 1 && i <= 6
+                ? [
+                    {'start': '09:00 AM', 'end': '06:00 PM'}
+                  ]
+                : [],
+          });
 
   Future<void> _load() async {
     if (loaded) return;
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    final rows = await ref.read(vendorRepositoryProvider).availability(vendorId);
+    final rows =
+        await ref.read(vendorRepositoryProvider).availability(vendorId);
     if (rows.isNotEmpty) {
       final defaults = _defaults();
       for (final row in rows) {
@@ -59,11 +91,15 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
       child: FutureBuilder(
         future: _load(),
         builder: (_, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Text('Set your weekly schedule. Customers can only book when you are available.', style: TextStyle(color: Colors.black54)),
+              const Text(
+                  'Set your weekly schedule. Customers can only book when you are available.',
+                  style: TextStyle(color: Colors.black54)),
               const SizedBox(height: 16),
               ...schedule.map((day) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -72,29 +108,73 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
                         children: [
                           Row(
                             children: [
-                              Switch(value: day['is_available'] == true, onChanged: (v) => _mutate(() => day['is_available'] = v)),
-                              Expanded(child: Text(days[day['day_of_week']], style: const TextStyle(fontWeight: FontWeight.w800))),
+                              Switch(
+                                  value: day['is_available'] == true,
+                                  onChanged: (v) =>
+                                      _mutate(() => day['is_available'] = v)),
+                              Expanded(
+                                  child: Text(days[day['day_of_week']],
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800))),
                               if (day['is_available'] == true)
-                                TextButton.icon(onPressed: () => _mutate(() => (day['time_slots'] as List).add({'start': '09:00 AM', 'end': '05:00 PM'})), icon: const Icon(Icons.add_rounded), label: const Text('Add Slot')),
+                                TextButton.icon(
+                                    onPressed: () => _mutate(() =>
+                                        (day['time_slots'] as List).add({
+                                          'start': '09:00 AM',
+                                          'end': '05:00 PM'
+                                        })),
+                                    icon: const Icon(Icons.add_rounded),
+                                    label: const Text('Add Slot')),
                             ],
                           ),
                           if (day['is_available'] == true)
-                            ...(day['time_slots'] as List).asMap().entries.map((entry) {
-                              final slot = Map<String, dynamic>.from(entry.value);
+                            ...(day['time_slots'] as List)
+                                .asMap()
+                                .entries
+                                .map((entry) {
+                              final slot =
+                                  Map<String, dynamic>.from(entry.value);
                               return Padding(
-                                padding: const EdgeInsets.only(left: 48, bottom: 8),
+                                padding:
+                                    const EdgeInsets.only(left: 48, bottom: 8),
                                 child: Row(
                                   children: [
-                                    Expanded(child: _TimeDrop(value: slot['start'], onChanged: (v) => _mutate(() => (day['time_slots'] as List)[entry.key]['start'] = v))),
-                                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('to')),
-                                    Expanded(child: _TimeDrop(value: slot['end'], onChanged: (v) => _mutate(() => (day['time_slots'] as List)[entry.key]['end'] = v))),
-                                    IconButton(onPressed: () => _mutate(() => (day['time_slots'] as List).removeAt(entry.key)), icon: const Icon(Icons.delete_outline_rounded)),
+                                    Expanded(
+                                        child: _TimeDrop(
+                                            value: slot['start'],
+                                            onChanged: (v) => _mutate(() =>
+                                                (day['time_slots']
+                                                        as List)[entry.key]
+                                                    ['start'] = v))),
+                                    const Padding(
+                                        padding:
+                                            EdgeInsets.symmetric(horizontal: 8),
+                                        child: Text('to')),
+                                    Expanded(
+                                        child: _TimeDrop(
+                                            value: slot['end'],
+                                            onChanged: (v) => _mutate(() =>
+                                                (day['time_slots']
+                                                        as List)[entry.key]
+                                                    ['end'] = v))),
+                                    IconButton(
+                                        onPressed: () => _mutate(() =>
+                                            (day['time_slots'] as List)
+                                                .removeAt(entry.key)),
+                                        icon: const Icon(
+                                            Icons.delete_outline_rounded)),
                                   ],
                                 ),
                               );
                             })
                           else
-                            const Padding(padding: EdgeInsets.only(left: 48), child: Align(alignment: Alignment.centerLeft, child: Text('Not available', style: TextStyle(color: Colors.black54)))),
+                            const Padding(
+                                padding: EdgeInsets.only(left: 48),
+                                child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text('Not available',
+                                        style:
+                                            TextStyle(color: Colors.black54)))),
                         ],
                       ),
                     ),
@@ -114,7 +194,9 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
   Future<void> _save() async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    await ref.read(vendorRepositoryProvider).saveAvailability(vendorId, schedule);
+    await ref
+        .read(vendorRepositoryProvider)
+        .saveAvailability(vendorId, schedule);
     setState(() => changed = false);
   }
 }
@@ -128,7 +210,10 @@ class _TimeDrop extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       initialValue: value,
-      items: _AvailabilityPageState.times.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 12)))).toList(),
+      items: _AvailabilityPageState.times
+          .map((t) => DropdownMenuItem(
+              value: t, child: Text(t, style: const TextStyle(fontSize: 12))))
+          .toList(),
       onChanged: (v) {
         if (v != null) onChanged(v);
       },

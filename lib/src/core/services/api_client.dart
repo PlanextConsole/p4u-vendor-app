@@ -51,17 +51,26 @@ class ApiSession {
     return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
   }
 
-  Future<void> saveAuth(Map<String, dynamic> data, {Map<String, dynamic>? profile}) async {
+  Future<void> saveAuth(Map<String, dynamic> data,
+      {Map<String, dynamic>? profile}) async {
     final prefs = await SharedPreferences.getInstance();
     final access = data['accessToken'] ?? data['access_token'];
     final refresh = data['refreshToken'] ?? data['refresh_token'];
     final vendorId = data['vendorId'] ?? data['vendor_id'];
     final roles = data['roles'];
-    if (access != null) await prefs.setString(_accessTokenKey, access.toString());
-    if (refresh != null) await prefs.setString(_refreshTokenKey, refresh.toString());
-    if (vendorId != null) await prefs.setString(_vendorIdKey, vendorId.toString());
+    if (access != null) {
+      await prefs.setString(_accessTokenKey, access.toString());
+    }
+    if (refresh != null) {
+      await prefs.setString(_refreshTokenKey, refresh.toString());
+    }
+    if (vendorId != null) {
+      await prefs.setString(_vendorIdKey, vendorId.toString());
+    }
     if (roles != null) await prefs.setString(_rolesKey, jsonEncode(roles));
-    if (profile != null) await prefs.setString(_profileKey, jsonEncode(profile));
+    if (profile != null) {
+      await prefs.setString(_profileKey, jsonEncode(profile));
+    }
     _changes.add(null);
   }
 
@@ -92,8 +101,11 @@ class ApiClient {
     defaultValue: 'https://api.planext4u.com',
   );
 
+  static Future<void> _requestQueue = Future.value();
+
   final ApiSession session;
   final _http = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+  Future<void>? _refreshInFlight;
 
   Future<Map<String, dynamic>> getJson(
     String path, {
@@ -154,26 +166,66 @@ class ApiClient {
     if (auth) await _attachAuth(request);
 
     final boundary = '----p4u-${DateTime.now().microsecondsSinceEpoch}';
-    request.headers.contentType = ContentType('multipart', 'form-data', parameters: {'boundary': boundary});
+    request.headers.contentType = ContentType('multipart', 'form-data',
+        parameters: {'boundary': boundary});
 
     for (final entry in fields.entries) {
       if (entry.value == null) continue;
       request.write('--$boundary\r\n');
-      request.write('Content-Disposition: form-data; name="${entry.key}"\r\n\r\n');
+      request
+          .write('Content-Disposition: form-data; name="${entry.key}"\r\n\r\n');
       request.write('${entry.value}\r\n');
     }
 
     final fileName = file.path.split(RegExp(r'[\\/]')).last;
     request.write('--$boundary\r\n');
-    request.write('Content-Disposition: form-data; name="$field"; filename="$fileName"\r\n');
-    request.write('Content-Type: ${contentType ?? 'application/octet-stream'}\r\n\r\n');
+    request.write(
+        'Content-Disposition: form-data; name="$field"; filename="$fileName"\r\n');
+    request.write(
+        'Content-Type: ${contentType ?? 'application/octet-stream'}\r\n\r\n');
     request.add(await file.readAsBytes());
     request.write('\r\n--$boundary--\r\n');
 
     return _decodeResponse(await request.close());
   }
 
+  Future<T> _runQueued<T>(Future<T> Function() action) {
+    final queued = _requestQueue.then((_) async {
+      await Future.delayed(const Duration(milliseconds: 250));
+      return action();
+    });
+    _requestQueue = queued.then((_) {}, onError: (_) {});
+    return queued;
+  }
+
   Future<Map<String, dynamic>> _send(
+    String method,
+    String path, {
+    Map<String, Object?> query = const {},
+    Object? body,
+    bool auth = false,
+  }) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await _runQueued(() =>
+            _sendOnce(method, path, query: query, body: body, auth: auth));
+      } on ApiException catch (e) {
+        if (e.statusCode == 429 && attempt < 2) {
+          await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+          continue;
+        }
+        if (!auth || e.statusCode != 401) rethrow;
+        await _refreshAuthDeduped();
+        return _runQueued(() =>
+            _sendOnce(method, path, query: query, body: body, auth: auth));
+      }
+    }
+    throw const ApiException(
+        'Too many requests. Please wait a moment and try again.',
+        statusCode: 429);
+  }
+
+  Future<Map<String, dynamic>> _sendOnce(
     String method,
     String path, {
     Map<String, Object?> query = const {},
@@ -186,6 +238,38 @@ class ApiClient {
     if (auth) await _attachAuth(request);
     if (body != null) request.write(jsonEncode(body));
     return _decodeResponse(await request.close());
+  }
+
+  Future<void> _refreshAuthDeduped() {
+    final current = _refreshInFlight;
+    if (current != null) return current;
+    final refresh = _refreshAuth().whenComplete(() => _refreshInFlight = null);
+    _refreshInFlight = refresh;
+    return refresh;
+  }
+
+  Future<void> _refreshAuth() async {
+    final refreshToken = await session.refreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await session.clear();
+      throw const ApiException('Session expired. Please login again.',
+          statusCode: 401);
+    }
+
+    final request =
+        await _http.openUrl('POST', _uri('/api/auth/public/refresh'));
+    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'refreshToken': refreshToken}));
+
+    try {
+      final data = await _decodeResponse(await request.close());
+      final auth = apiObject(data['auth'] ?? data['data'] ?? data) ?? data;
+      await session.saveAuth(auth);
+    } on ApiException {
+      await session.clear();
+      rethrow;
+    }
   }
 
   Uri _uri(String path, [Map<String, Object?> query = const {}]) {
@@ -205,11 +289,14 @@ class ApiClient {
 
   Future<void> _attachAuth(HttpClientRequest request) async {
     final token = await session.accessToken();
-    if (token == null || token.isEmpty) throw const ApiException('Please login to continue.', statusCode: 401);
+    if (token == null || token.isEmpty) {
+      throw const ApiException('Please login to continue.', statusCode: 401);
+    }
     request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
   }
 
-  Future<Map<String, dynamic>> _decodeResponse(HttpClientResponse response) async {
+  Future<Map<String, dynamic>> _decodeResponse(
+      HttpClientResponse response) async {
     final raw = await response.transform(utf8.decoder).join();
     final decoded = raw.isEmpty ? <String, dynamic>{} : jsonDecode(raw);
     final data = decoded is Map<String, dynamic>
@@ -218,8 +305,12 @@ class ApiClient {
             ? Map<String, dynamic>.from(decoded)
             : {'items': decoded};
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = data['message'] ?? data['error'] ?? data['code'] ?? 'API request failed';
-      throw ApiException(message.toString(), statusCode: response.statusCode, details: data);
+      final message = data['message'] ??
+          data['error'] ??
+          data['code'] ??
+          'API request failed';
+      throw ApiException(message.toString(),
+          statusCode: response.statusCode, details: data);
     }
     return data;
   }
@@ -227,13 +318,38 @@ class ApiClient {
 
 List<Map<String, dynamic>> apiItems(Object? value) {
   if (value is List) {
-    return value.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList();
+    return value
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
   }
   if (value is Map) {
     final map = Map<String, dynamic>.from(value);
-    for (final key in ['items', 'data', 'results', 'rows', 'products', 'services', 'orders', 'bookings', 'settlements', 'assets']) {
+    for (final key in [
+      'items',
+      'data',
+      'results',
+      'rows',
+      'products',
+      'services',
+      'vendorServices',
+      'orders',
+      'bookings',
+      'settlements',
+      'assets',
+      'media',
+      'documents',
+      'notifications',
+      'folders',
+      'categories',
+      'suppliers',
+    ]) {
       final nested = map[key];
       if (nested is List) return apiItems(nested);
+      if (nested is Map) {
+        final rows = apiItems(nested);
+        if (rows.isNotEmpty) return rows;
+      }
     }
   }
   return [];
