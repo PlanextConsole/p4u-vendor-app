@@ -157,7 +157,7 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(26),
-        color: const Color(0xFFF7FAFA),
+        color: AppColors.productSurface,
       ),
       child: Row(
         children: [
@@ -191,7 +191,7 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
           margin: const EdgeInsets.symmetric(horizontal: 1),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFD5F1F0) : Colors.transparent,
+            color: selected ? AppColors.softGreen : Colors.transparent,
             borderRadius: BorderRadius.circular(22),
           ),
           child: Row(
@@ -238,7 +238,7 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFFF7E8), Colors.white, Color(0xFFE8FFFF)],
+            colors: [AppColors.accent, Colors.white, AppColors.softGreen],
           ),
         ),
         child: SafeArea(
@@ -276,7 +276,7 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                                 borderRadius: BorderRadius.circular(18),
                                 boxShadow: const [
                                   BoxShadow(
-                                    color: Color(0x33011D33),
+                                    color: Color(0x331F1F1F),
                                     blurRadius: 18,
                                     offset: Offset(0, 8),
                                   ),

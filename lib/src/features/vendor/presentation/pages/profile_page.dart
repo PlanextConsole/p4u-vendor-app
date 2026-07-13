@@ -32,7 +32,7 @@ class ProfilePage extends ConsumerWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
                 gradient: const LinearGradient(
-                    colors: [Color(0x33009999), Color(0x11009999)]),
+                    colors: [Color(0x330C831F), Color(0x110C831F)]),
                 image: vendor['background_image'] != null
                     ? DecorationImage(
                         image: NetworkImage(vendor['background_image']),

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class AppCard extends StatelessWidget {
   const AppCard({
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(14),
     this.onTap,
     super.key,
   });
@@ -17,7 +17,7 @@ class AppCard extends StatelessWidget {
     final card = Card(child: Padding(padding: padding, child: child));
     if (onTap == null) return card;
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: card,
     );

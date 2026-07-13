@@ -64,7 +64,26 @@ class VendorScaffold extends ConsumerWidget {
     final current = destinations.indexWhere((d) => d.path == location);
     return Scaffold(
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Image.asset('assets/images/p4u-logo.png',
+                  fit: BoxFit.contain),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Notifications',
@@ -76,20 +95,92 @@ class VendorScaffold extends ConsumerWidget {
       ),
       drawer: _VendorDrawer(activePath: location),
       body: SafeArea(child: child),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _VendorBottomNav(
+        destinations: destinations,
         selectedIndex: current < 0 ? 0 : current,
-        backgroundColor: Colors.white,
-        indicatorColor: AppColors.primary,
-        onDestinationSelected: (index) => context.go(destinations[index].path),
-        destinations: destinations
-            .map((d) => NavigationDestination(
-                  icon: Icon(d.icon),
-                  selectedIcon: Icon(d.icon, color: Colors.white),
-                  label: d.label,
-                ))
-            .toList(),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+}
+
+class _VendorBottomNav extends StatelessWidget {
+  const _VendorBottomNav({
+    required this.destinations,
+    required this.selectedIndex,
+  });
+
+  final List<_Destination> destinations;
+  final int selectedIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 70,
+        padding: const EdgeInsets.all(6),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Row(
+          children: [
+            for (var index = 0; index < destinations.length; index++)
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    if (index != selectedIndex) {
+                      context.go(destinations[index].path);
+                    }
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        height: 30,
+                        child: Icon(
+                          destinations[index].icon,
+                          size: 23,
+                          color: index == selectedIndex
+                              ? AppColors.primary
+                              : AppColors.brandDark.withValues(alpha: .72),
+                        ),
+                      ),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: index == selectedIndex ? 18 : 0,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          destinations[index].label,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: index == selectedIndex
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                            color: index == selectedIndex
+                                ? AppColors.primary
+                                : AppColors.brandDark.withValues(alpha: .72),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
