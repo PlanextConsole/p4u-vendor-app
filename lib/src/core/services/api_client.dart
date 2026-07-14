@@ -327,6 +327,27 @@ class ApiClient {
       throw ApiException(message.toString(),
           statusCode: response.statusCode, details: data);
     }
+    // Mirror web/customer client: unwrap `{ success: true, data: ... }`.
+    if (data['success'] == true && data.containsKey('data')) {
+      final inner = data['data'];
+      if (inner is Map) {
+        final result = Map<String, dynamic>.from(inner);
+        for (final key in const ['total', 'limit', 'offset', 'page']) {
+          if (data[key] != null && result[key] == null) {
+            result[key] = data[key];
+          }
+        }
+        return result;
+      }
+      if (inner is List) {
+        return {
+          'items': inner,
+          if (data['total'] != null) 'total': data['total'],
+          if (data['limit'] != null) 'limit': data['limit'],
+          if (data['offset'] != null) 'offset': data['offset'],
+        };
+      }
+    }
     return data;
   }
 }

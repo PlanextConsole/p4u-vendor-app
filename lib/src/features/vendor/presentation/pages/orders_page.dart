@@ -26,10 +26,23 @@ class OrdersPage extends ConsumerWidget {
                   DateTime.tryParse(o['created_at']?.toString() ?? ''),
                   DateTime.now()))
               .length;
-          final pending = items.where((o) => o['status'] == 'placed').length;
+          final pending = items
+              .where((o) => const {
+                    'placed',
+                    'created',
+                    'pending',
+                    'paid',
+                    'new'
+                  }.contains(o['status']))
+              .length;
           final active = items
-              .where((o) => ['accepted', 'in_progress', 'paid', 'shipped']
-                  .contains(o['status']))
+              .where((o) => const {
+                    'accepted',
+                    'in_progress',
+                    'paid',
+                    'shipped',
+                    'delivered'
+                  }.contains(o['status']))
               .length;
           final revenue = items.where((o) {
             final d = DateTime.tryParse(o['created_at']?.toString() ?? '');
@@ -87,19 +100,29 @@ class OrdersPage extends ConsumerWidget {
                   child: TabBarView(
                     children: [
                       _OrderList(items),
-                      _OrderList(
-                          items.where((o) => o['status'] == 'placed').toList()),
                       _OrderList(items
-                          .where((o) => [
-                                'accepted',
-                                'in_progress',
+                          .where((o) => const {
+                                'placed',
+                                'created',
+                                'pending',
                                 'paid',
-                                'shipped'
-                              ].contains(o['status']))
+                                'new'
+                              }.contains(o['status']))
                           .toList()),
                       _OrderList(items
-                          .where((o) => ['completed', 'delivered', 'cancelled']
-                              .contains(o['status']))
+                          .where((o) => const {
+                                'accepted',
+                                'in_progress',
+                                'shipped',
+                                'delivered'
+                              }.contains(o['status']))
+                          .toList()),
+                      _OrderList(items
+                          .where((o) => const {
+                                'completed',
+                                'delivered',
+                                'cancelled'
+                              }.contains(o['status']))
                           .toList()),
                     ],
                   ),
@@ -119,6 +142,10 @@ class _OrderList extends ConsumerWidget {
 
   static const flow = {
     'placed': ('accepted', 'Accept Order'),
+    'created': ('accepted', 'Accept Order'),
+    'pending': ('accepted', 'Accept Order'),
+    'paid': ('accepted', 'Accept Order'),
+    'new': ('accepted', 'Accept Order'),
     'accepted': ('in_progress', 'Start Processing'),
     'in_progress': ('shipped', 'Mark Shipped'),
     'shipped': ('delivered', 'Out for Delivery'),
@@ -195,7 +222,13 @@ class _OrderList extends ConsumerWidget {
                               _update(context, ref, order, next.$1),
                           child: Text(next.$2),
                         ),
-                        if (status == 'placed')
+                        if (const {
+                          'placed',
+                          'created',
+                          'pending',
+                          'paid',
+                          'new'
+                        }.contains(status))
                           OutlinedButton(
                             onPressed: () =>
                                 _update(context, ref, order, 'cancelled'),

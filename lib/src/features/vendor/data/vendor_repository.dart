@@ -205,11 +205,21 @@ class VendorRepository {
 
   Future<void> updateOrderStatus(String id, String status,
       [Map<String, dynamic>? shippingData]) async {
+    Map<String, dynamic>? metadata;
+    if (shippingData != null) {
+      final current = await order(id);
+      final existing = current?['metadata'];
+      final base = existing is Map
+          ? Map<String, dynamic>.from(existing)
+          : <String, dynamic>{};
+      // Merge shipping fields — never replace entire metadata (wipes line items).
+      metadata = {...base, ...shippingData};
+    }
     await _api.patchJson(
       '/api/v1/vendor/orders/$id',
       body: {
         'status': status,
-        if (shippingData != null) 'metadata': shippingData
+        if (metadata != null) 'metadata': metadata,
       },
       auth: true,
     );
@@ -359,8 +369,15 @@ class VendorRepository {
   Future<List<Map<String, dynamic>>> availability(String vendorId) async {
     final data = await _safeMap(() =>
         _api.getJson('/api/v1/vendor/me/booking-availability', auth: true));
-    _availabilityDto = data == null ? null : Map<String, dynamic>.from(data);
-    final weekly = data?['weekly'];
+    // Web unwraps `{ availability: DTO }` — without this the schedule is blank
+    // and saving rebuilds weekly from empty → wipe.
+    final raw = data == null
+        ? null
+        : (data['availability'] is Map
+            ? Map<String, dynamic>.from(data['availability'] as Map)
+            : Map<String, dynamic>.from(data));
+    _availabilityDto = raw;
+    final weekly = raw?['weekly'];
     final rows = <Map<String, dynamic>>[];
     if (weekly is Map) {
       weekly.forEach((key, value) {
@@ -632,11 +649,17 @@ class VendorRepository {
         'gstCertificate': form.s('gst_certificate_url').isEmpty
             ? null
             : form.s('gst_certificate_url'),
+        'gstCertificateUrl': form.s('gst_certificate_url').isEmpty
+            ? null
+            : form.s('gst_certificate_url'),
         'fssai': form.s('fssai_url').isEmpty ? null : form.s('fssai_url'),
         'panCardFileName': form.s('pan_image_url').isEmpty
             ? null
             : form.s('pan_image_url'),
         'panImage': form.s('pan_image_url').isEmpty
+            ? null
+            : form.s('pan_image_url'),
+        'panCardUrl': form.s('pan_image_url').isEmpty
             ? null
             : form.s('pan_image_url'),
         'aadhaarFront': form.s('aadhaar_front_url').isEmpty
@@ -645,6 +668,9 @@ class VendorRepository {
         'aadhaarBack': form.s('aadhaar_back_url').isEmpty
             ? null
             : form.s('aadhaar_back_url'),
+        'aadhaarCardUrl': form.s('aadhaar_front_url').isEmpty
+            ? null
+            : form.s('aadhaar_front_url'),
       },
       'bankJson': _bankPayload(form),
     };
@@ -653,9 +679,17 @@ class VendorRepository {
     final price = values.n('price');
     final discount = values.n('discount');
     final finalPrice = price - discount;
+    final stock = values.i('stock', values.i('quantity'));
+    final existingMeta = values['metadata'] is Map
+        ? Map<String, dynamic>.from(values['metadata'] as Map)
+        : <String, dynamic>{};
     return {
       'name': values.s('title', values.s('name')),
       'categoryId': values.s('category_id', values.s('categoryId')),
+      if (values.s('taxConfigurationId', values.s('tax_configuration_id'))
+          .isNotEmpty)
+        'taxConfigurationId':
+            values.s('taxConfigurationId', values.s('tax_configuration_id')),
       'sellPrice': price.toStringAsFixed(2),
       'discountAmount': discount.toStringAsFixed(2),
       'finalPrice': (finalPrice < 0 ? 0 : finalPrice).toStringAsFixed(2),
@@ -664,9 +698,15 @@ class VendorRepository {
       'longDescription':
           values.s('long_description', values.s('longDescription')),
       'thumbnailUrl': values.s('image', values.s('thumbnailUrl')),
-      'availability': values['availability'] ?? true,
       'isActive': values.s('status', 'active') == 'active',
-      'metadata': {...values, 'stock': values.i('stock')},
+      'metadata': {
+        ...existingMeta,
+        'sku': values.s('sku', existingMeta.s('sku')),
+        'productType':
+            values.s('productType', existingMeta.s('productType', 'simple')),
+        'quantity': stock,
+        'stock': stock,
+      },
     };
   }
 
@@ -805,28 +845,39 @@ class VendorRepository {
     };
   }
 
-  Map<String, dynamic> _normalizeProduct(Map<String, dynamic> row) => {
-        ...row,
-        'id': row.s('id', row.s('productId')),
-        'title': row.s('title', row.s('name')),
-        'price': row.n('price', row.n('sellPrice', row.n('finalPrice'))),
-        'discount': row.n('discount', row.n('discountAmount')),
-        'stock': row.i('stock', row.i('availableStock')),
-        'image': _resolveUrl(_imageFrom(row, const [
-          'image',
-          'imageUrl',
-          'image_url',
-          'thumbnailUrl',
-          'thumbnail_url',
-          'primaryImageUrl',
-          'primary_image_url',
-          'images',
-          'imageUrls',
-          'mediaUrls'
-        ])),
-        'status':
-            row.s('status', row['isActive'] == false ? 'inactive' : 'active'),
-      };
+  Map<String, dynamic> _normalizeProduct(Map<String, dynamic> row) {
+    final moderation = row
+        .s('moderationStatus', row.s('moderation_status', 'approved'))
+        .toLowerCase();
+    final status = moderation == 'pending' || moderation == 'pending_approval'
+        ? 'pending_approval'
+        : row.s('status', row['isActive'] == false ? 'inactive' : 'active');
+    final meta = _metadata(row);
+    return {
+      ...row,
+      'id': row.s('id', row.s('productId')),
+      'title': row.s('title', row.s('name')),
+      'price': row.n('price', row.n('sellPrice', row.n('finalPrice'))),
+      'discount': row.n('discount', row.n('discountAmount')),
+      'stock': row.i('stock',
+          row.i('availableStock', meta.i('quantity', meta.i('stock')))),
+      'category_id': row.s('categoryId', row.s('category_id')),
+      'image': _resolveUrl(_imageFrom(row, const [
+        'image',
+        'imageUrl',
+        'image_url',
+        'thumbnailUrl',
+        'thumbnail_url',
+        'primaryImageUrl',
+        'primary_image_url',
+        'images',
+        'imageUrls',
+        'mediaUrls'
+      ])),
+      'status': status,
+      'moderation_status': moderation,
+    };
+  }
   Map<String, dynamic> _normalizeService(Map<String, dynamic> row) {
     final metadata = _metadata(row);
     final catalogMeta =
@@ -1001,16 +1052,28 @@ class VendorRepository {
         'status': row.s('status', row['read'] == true ? 'read' : 'unread'),
         'created_at': row.s('created_at', row.s('createdAt')),
       };
-  Map<String, dynamic> _normalizeMedia(Map<String, dynamic> row) => {
-        ...row,
-        'id': row.s('id', row.s('assetId')),
-        'file_name': row.s('file_name', row.s('fileName', row.s('name'))),
-        'file_url': _resolveUrl(_imageFrom(
-            row, const ['file_url', 'fileUrl', 'url', 'path', 'publicUrl'])),
-        'file_type': row.s('file_type', row.s('fileType', row.s('type'))),
-        'file_size': row.i('file_size', row.i('fileSize')),
-        'created_at': row.s('created_at', row.s('createdAt')),
-      };
+  Map<String, dynamic> _normalizeMedia(Map<String, dynamic> row) {
+    final mime = row.s('mimeType', row.s('mime_type', row.s('fileType')));
+    final type = mime.startsWith('image/')
+        ? 'image'
+        : (mime.contains('pdf') || mime.contains('document')
+            ? 'document'
+            : row.s('file_type', row.s('fileType', row.s('type', 'file'))));
+    return {
+      ...row,
+      'id': row.s('id', row.s('assetId')),
+      'file_name': row.s(
+          'file_name',
+          row.s('fileName',
+              row.s('originalName', row.s('original_name', row.s('name'))))),
+      'file_url': _resolveUrl(_imageFrom(
+          row, const ['file_url', 'fileUrl', 'url', 'path', 'publicUrl'])),
+      'file_type': type,
+      'mime_type': mime,
+      'file_size': row.i('file_size', row.i('fileSize', row.i('sizeBytes'))),
+      'created_at': row.s('created_at', row.s('createdAt')),
+    };
+  }
 
   Map<String, dynamic> _metadata(Map<String, dynamic> row) {
     final raw = row['metadata'];
