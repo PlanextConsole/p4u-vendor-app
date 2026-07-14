@@ -5,19 +5,21 @@ import 'package:google_fonts/google_fonts.dart';
 /// Shared P4U visual language, kept in sync with the customer application.
 class AppColors {
   static const brandDark = Color(0xFF1F1F1F);
-  static const primary = Color(0xFF0C831F);
-  static const primaryDark = Color(0xFF086B18);
+  // Brand palette — Teal. `success` stays green (semantic).
+  static const primary = Color(0xFF009E97);
+  static const primaryDark = Color(0xFF007A75);
   static const background = Color(0xFFF7F7F7);
   static const card = Color(0xFFFFFFFF);
   static const border = Color(0xFFE8E8E8);
   static const muted = Color(0xFF696969);
-  static const accent = Color(0xFFF3FBEF);
+  static const accent = Color(0xFFE0F5F4);
   static const warning = Color(0xFFE76F51);
   static const success = Color(0xFF0C831F);
-  static const info = Color(0xFF256FDB);
+  static const info = Color(0xFF008C86);
   static const danger = Color(0xFFD92D20);
   static const headerSurface = Color(0xFFFFFFFF);
-  static const softGreen = Color(0xFFEDF8EF);
+  // Soft brand tint (kept the name for compatibility; soft teal).
+  static const softGreen = Color(0xFFE0F5F4);
   static const productSurface = Color(0xFFF8F8F8);
 }
 

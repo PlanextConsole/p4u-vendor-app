@@ -446,9 +446,18 @@ class _AccountControlPage extends ConsumerWidget {
 }
 
 class _SettingsPageState extends ConsumerState<_SettingsPage> {
+  final currentPassword = TextEditingController();
   final password = TextEditingController();
   final confirm = TextEditingController();
   bool saving = false;
+
+  @override
+  void dispose() {
+    currentPassword.dispose();
+    password.dispose();
+    confirm.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -464,6 +473,12 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                 const Text('Change Password',
                     style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
+                TextField(
+                    controller: currentPassword,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Current password')),
+                const SizedBox(height: 10),
                 TextField(
                     controller: password,
                     obscureText: true,
@@ -517,11 +532,21 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   }
 
   Future<void> _changePassword() async {
-    if (password.text.length < 6 || password.text != confirm.text) return;
+    if (currentPassword.text.isEmpty ||
+        password.text.length < 6 ||
+        password.text != confirm.text) {
+      return;
+    }
     setState(() => saving = true);
     try {
-      await ref.read(authRepositoryProvider).updatePassword(password.text);
+      await ref.read(authRepositoryProvider).updatePassword(
+            currentPassword.text,
+            password.text,
+          );
       if (mounted) {
+        currentPassword.clear();
+        password.clear();
+        confirm.clear();
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Password updated')));
       }

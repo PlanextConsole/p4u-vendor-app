@@ -72,7 +72,7 @@ class VendorScaffold extends ConsumerWidget {
               height: 32,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.softGreen, // soft teal brand tile
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Image.asset('assets/images/p4u-logo.png',
@@ -210,13 +210,17 @@ class _VendorDrawer extends ConsumerWidget {
       const _Destination(
           'Settlements', '/settlements', Icons.currency_rupee_rounded),
       const _Destination('Payment History', '/payments', Icons.history_rounded),
-      const _Destination(
-          'Wallet', '/wallet', Icons.account_balance_wallet_rounded),
+      // Hidden to match the vendor web (no Wallet module on web). Route/page
+      // code is kept in the router — only the menu entry is hidden.
+      // const _Destination(
+      //     'Wallet', '/wallet', Icons.account_balance_wallet_rounded),
       const _Destination(
           'Bank Account', '/bank', Icons.account_balance_rounded),
       const _Destination('Media Library', '/media', Icons.perm_media_rounded),
-      const _Destination('Analytics', '/analytics', Icons.bar_chart_rounded),
-      const _Destination('Reviews', '/reviews', Icons.star_rounded),
+      // Hidden to match the vendor web (no dedicated Analytics/Reviews modules).
+      // Kept in the router; only hidden from the menu.
+      // const _Destination('Analytics', '/analytics', Icons.bar_chart_rounded),
+      // const _Destination('Reviews', '/reviews', Icons.star_rounded),
       const _Destination('Support', '/support', Icons.help_outline_rounded),
       const _Destination('Settings', '/settings', Icons.settings_rounded),
       const _Destination('Account Control', '/account-control',

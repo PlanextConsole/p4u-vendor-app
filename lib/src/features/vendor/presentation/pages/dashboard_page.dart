@@ -100,15 +100,7 @@ class DashboardPage extends ConsumerWidget {
                                 isCurved: true,
                                 color: AppColors.primary,
                                 barWidth: 3,
-                                spots: const [
-                                  FlSpot(0, 12),
-                                  FlSpot(1, 18),
-                                  FlSpot(2, 15),
-                                  FlSpot(3, 22),
-                                  FlSpot(4, 28),
-                                  FlSpot(5, 32),
-                                  FlSpot(6, 25),
-                                ],
+                                spots: _weekRevenueSpots(dashboard.orders),
                                 belowBarData: BarAreaData(
                                     show: true,
                                     color: AppColors.primary
@@ -274,6 +266,30 @@ String _activityTitle(Map<String, dynamic> row, String activityLabel) {
     return '$customer $activityLabel';
   }
   return activityLabel == 'Bookings' ? 'Service booking' : 'Customer order';
+}
+
+/// Last 7 calendar days of non-cancelled order totals (x = 0..6 oldest→newest).
+List<FlSpot> _weekRevenueSpots(List<Map<String, dynamic>> orders) {
+  final now = DateTime.now();
+  final start = DateTime(now.year, now.month, now.day)
+      .subtract(const Duration(days: 6));
+  final totals = List<double>.filled(7, 0);
+  for (final o in orders) {
+    if (o['status']?.toString() == 'cancelled') continue;
+    final created = DateTime.tryParse(
+        '${o['created_at'] ?? o['createdAt'] ?? ''}');
+    if (created == null) continue;
+    final day = DateTime(created.year, created.month, created.day);
+    final idx = day.difference(start).inDays;
+    if (idx < 0 || idx > 6) continue;
+    final amount = o['total'] ?? o['total_amount'] ?? 0;
+    totals[idx] += amount is num
+        ? amount.toDouble()
+        : double.tryParse(amount.toString()) ?? 0;
+  }
+  return [
+    for (var i = 0; i < 7; i++) FlSpot(i.toDouble(), totals[i]),
+  ];
 }
 
 String _firstText(Map<String, dynamic> row, List<String> keys) {

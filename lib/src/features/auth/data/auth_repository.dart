@@ -81,10 +81,13 @@ class AuthRepository {
     await apiSession.clear();
   }
 
-  Future<void> updatePassword(String password) async {
+  Future<void> updatePassword(String currentPassword, String newPassword) async {
     await _api.postJson(
       '/api/auth/change-password',
-      body: {'currentPassword': '', 'newPassword': password},
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
       auth: true,
     );
   }
@@ -108,7 +111,16 @@ final authRepositoryProvider = Provider((ref) => AuthRepository());
 
 final authStateProvider = StreamProvider<VendorUser?>((ref) async* {
   final repo = ref.watch(authRepositoryProvider);
-  yield await repo.currentVendor();
+  final fallbackId = await apiSession.vendorId();
+  if (!await apiSession.hasToken()) {
+    yield null;
+  } else {
+    final cached = await apiSession.cachedProfile();
+    if (cached != null) {
+      yield VendorUser.fromApi(cached, fallbackId: fallbackId);
+    }
+    yield await repo.currentVendor();
+  }
   await for (final _ in repo.authChanges) {
     yield await repo.currentVendor();
   }

@@ -25,7 +25,8 @@ class BookingsPage extends ConsumerWidget {
         error: (e, _) => Center(child: Text('$e')),
         data: (items) {
           final pending = items
-              .where((b) => ['pending', 'confirmed'].contains(b['status']))
+              .where((b) =>
+                  ['pending', 'approved', 'confirmed'].contains(b['status']))
               .toList();
           final active =
               items.where((b) => b['status'] == 'in_progress').toList();
@@ -119,7 +120,7 @@ class _Section extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                      '${_date(b['booking_date'])} - ${b['start_time'] ?? ''} to ${b['end_time'] ?? ''}',
+                      '${_date(b['booking_date'] ?? b['bookingDate'])} - ${_slot(b)}',
                       style:
                           const TextStyle(fontSize: 12, color: Colors.black54)),
                   if (b['notes'] != null)
@@ -137,14 +138,14 @@ class _Section extends ConsumerWidget {
                                   fontWeight: FontWeight.w800))),
                       if (status == 'pending') ...[
                         FilledButton(
-                            onPressed: () => _update(ref, b, 'confirmed'),
+                            onPressed: () => _update(ref, b, 'approved'),
                             child: const Text('Accept')),
                         const SizedBox(width: 8),
                         OutlinedButton(
-                            onPressed: () => _update(ref, b, 'cancelled'),
+                            onPressed: () => _update(ref, b, 'rejected'),
                             child: const Text('Reject')),
                       ],
-                      if (status == 'confirmed')
+                      if (status == 'approved' || status == 'confirmed')
                         FilledButton(
                             onPressed: () => _update(ref, b, 'in_progress'),
                             child: const Text('Start Service')),
@@ -169,6 +170,20 @@ class _Section extends ConsumerWidget {
         }),
       ],
     );
+  }
+
+  String _slot(Map<String, dynamic> booking) {
+    final slot = booking['timeSlot']?.toString() ??
+        booking['time_slot']?.toString() ??
+        '';
+    if (slot.isNotEmpty) return slot;
+    final start = booking['start_time']?.toString() ??
+        booking['startTime']?.toString() ??
+        '';
+    final end =
+        booking['end_time']?.toString() ?? booking['endTime']?.toString() ?? '';
+    if (start.isEmpty && end.isEmpty) return '';
+    return '$start to $end';
   }
 
   Future<void> _update(

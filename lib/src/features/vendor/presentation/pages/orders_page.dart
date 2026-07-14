@@ -122,6 +122,7 @@ class _OrderList extends ConsumerWidget {
     'accepted': ('in_progress', 'Start Processing'),
     'in_progress': ('shipped', 'Mark Shipped'),
     'shipped': ('delivered', 'Out for Delivery'),
+    'delivered': ('completed', 'Mark Completed'),
   };
 
   @override

@@ -64,7 +64,16 @@ class BankAccountsPage extends ConsumerWidget {
                                     style: const TextStyle(
                                         fontSize: 12, color: Colors.black54)),
                                 Text(
-                                    'A/C: ****${(acc['account_number'] ?? '').toString().padLeft(4).substring((acc['account_number'] ?? '').toString().padLeft(4).length - 4)} - IFSC: ${acc['ifsc_code'] ?? ''}',
+                                    () {
+                                      final raw = (acc['account_number'] ?? '')
+                                          .toString();
+                                      final digits =
+                                          raw.replaceAll(RegExp(r'\D'), '');
+                                      final tail = digits.length <= 4
+                                          ? '****'
+                                          : '****${digits.substring(digits.length - 4)}';
+                                      return 'A/C: $tail - IFSC: ${acc['ifsc_code'] ?? ''}';
+                                    }(),
                                     style: const TextStyle(
                                         fontSize: 12, color: Colors.black54)),
                               ],
@@ -79,7 +88,9 @@ class BankAccountsPage extends ConsumerWidget {
                                     acc['id'].toString());
                               }
                               if (v == 'delete') {
-                                await repo.deleteBank(acc['id'].toString());
+                                await repo.deleteBank(
+                                    ref.read(vendorIdProvider)!,
+                                    acc['id'].toString());
                               }
                               ref.invalidate(vendorBanksProvider);
                             },
@@ -169,7 +180,7 @@ Future<void> _showBankForm(BuildContext context, WidgetRef ref) async {
                     vendorId,
                     {
                       'bank_name': bank.text.trim(),
-                      'account_holder': holder.text.trim(),
+                      'account_holder_name': holder.text.trim(),
                       'account_number': account.text.trim(),
                       'ifsc_code': ifsc.text.trim().toUpperCase(),
                       'account_type': type,

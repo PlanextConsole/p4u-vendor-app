@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -186,7 +186,11 @@ class _VendorRegisterPageState extends ConsumerState<VendorRegisterPage> {
           _dropdown('Business Type', 'business_type',
               const ['proprietorship', 'partnership', 'pvt_ltd']),
           _dropdown(
-              'Category', 'category', const ['product', 'service', 'both']),
+              'Vendor Type', 'category', const ['product', 'service']),
+          if (form['category'] == 'service')
+            _field('Service Name *', 'subcategory')
+          else
+            _field('Product Category *', 'subcategory'),
           _field('Store Name', 'store_name'),
           _field('Business Description', 'business_description', maxLines: 4),
           _uploadTile('store_logo_url', 'Store Logo'),
@@ -274,7 +278,9 @@ class _VendorRegisterPageState extends ConsumerState<VendorRegisterPage> {
           _review('Phone', form['phone']),
           _review('Email', form['email']),
           _review('Business', form['business_name']),
-          _review('Category', form['category']),
+          _review('Vendor Type', form['category']),
+          _review(form['category'] == 'service' ? 'Service' : 'Category',
+              form['subcategory']),
           _review(
               'KYC',
               form['aadhaar_number'].toString().isNotEmpty
@@ -499,6 +505,11 @@ class _VendorRegisterPageState extends ConsumerState<VendorRegisterPage> {
       if (form['business_name'].toString().trim().isEmpty) {
         return 'Business name is required';
       }
+      if (form['subcategory'].toString().trim().isEmpty) {
+        return form['category'] == 'service'
+            ? 'Service name is required'
+            : 'Product category is required';
+      }
     }
     if (step == 3) {
       final aadhaar = form['aadhaar_number'].toString();
@@ -569,3 +580,4 @@ class _VendorRegisterPageState extends ConsumerState<VendorRegisterPage> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 }
+

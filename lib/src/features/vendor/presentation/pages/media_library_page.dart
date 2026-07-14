@@ -8,40 +8,46 @@ import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/vendor_scaffold.dart';
 import '../../data/vendor_providers.dart';
 
-final mediaFolderProvider = StateProvider<String>((_) => 'all');
+/// API `type` filter: images | documents | all
+final mediaTypeProvider = StateProvider<String>((_) => 'all');
 final mediaSearchProvider = StateProvider<String>((_) => '');
+final mediaUploadFolderIdProvider = StateProvider<String?>((_) => null);
+
+final vendorMediaFoldersProvider = FutureProvider((ref) async {
+  final vendorId = ref.watch(vendorIdProvider);
+  if (vendorId == null) return <Map<String, dynamic>>[];
+  return ref.watch(vendorRepositoryProvider).mediaFolders(vendorId);
+});
 
 final vendorMediaProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   if (vendorId == null) return <Map<String, dynamic>>[];
-  final folder = ref.watch(mediaFolderProvider);
+  final type = ref.watch(mediaTypeProvider);
   final search = ref.watch(mediaSearchProvider);
   return ref
       .watch(vendorRepositoryProvider)
-      .media(vendorId, folder: folder, search: search);
+      .media(vendorId, type: type, search: search);
 });
 
 class MediaLibraryPage extends ConsumerWidget {
   const MediaLibraryPage({super.key});
 
-  static const folders = [
-    'all',
-    'products',
-    'logos',
-    'backgrounds',
-    'icons',
-    'general'
+  static const types = [
+    ('all', 'All files'),
+    ('images', 'Images'),
+    ('documents', 'Documents'),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final media = ref.watch(vendorMediaProvider);
-    final folder = ref.watch(mediaFolderProvider);
+    final type = ref.watch(mediaTypeProvider);
+    final folders = ref.watch(vendorMediaFoldersProvider);
     return VendorScaffold(
       title: 'Media Library',
       actions: [
         IconButton(
-            onPressed: () => _upload(ref),
+            onPressed: () => _upload(context, ref),
             icon: const Icon(Icons.upload_rounded)),
       ],
       child: Column(
@@ -59,13 +65,44 @@ class MediaLibraryPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  initialValue: folder,
-                  items: folders
-                      .map((f) => DropdownMenuItem(
-                          value: f, child: Text(f == 'all' ? 'All Files' : f)))
+                  initialValue: type,
+                  decoration: const InputDecoration(labelText: 'File type'),
+                  items: types
+                      .map((t) =>
+                          DropdownMenuItem(value: t.$1, child: Text(t.$2)))
                       .toList(),
                   onChanged: (v) =>
-                      ref.read(mediaFolderProvider.notifier).state = v ?? 'all',
+                      ref.read(mediaTypeProvider.notifier).state = v ?? 'all',
+                ),
+                const SizedBox(height: 10),
+                folders.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return OutlinedButton.icon(
+                        onPressed: () => _ensureUploadFolder(ref),
+                        icon: const Icon(Icons.create_new_folder_outlined),
+                        label: const Text('Create upload folder'),
+                      );
+                    }
+                    final selected = ref.watch(mediaUploadFolderIdProvider) ??
+                        items.first['id']?.toString();
+                    return DropdownButtonFormField<String>(
+                      initialValue: selected,
+                      decoration:
+                          const InputDecoration(labelText: 'Upload folder'),
+                      items: items
+                          .map((f) => DropdownMenuItem(
+                                value: f['id']?.toString(),
+                                child: Text(f['name']?.toString() ?? 'Folder'),
+                              ))
+                          .toList(),
+                      onChanged: (v) => ref
+                          .read(mediaUploadFolderIdProvider.notifier)
+                          .state = v,
+                    );
+                  },
                 ),
               ],
             ),
@@ -104,9 +141,14 @@ class MediaLibraryPage extends ConsumerWidget {
                                 Expanded(
                                   child: SizedBox(
                                     width: double.infinity,
-                                    child: item['file_type'] == 'video'
-                                        ? const Icon(Icons.videocam_rounded,
-                                            size: 42, color: Colors.black38)
+                                    child: item['file_type'] == 'video' ||
+                                            item['file_type'] == 'document'
+                                        ? Icon(
+                                            item['file_type'] == 'video'
+                                                ? Icons.videocam_rounded
+                                                : Icons.description_rounded,
+                                            size: 42,
+                                            color: Colors.black38)
                                         : Image.network(
                                             item['file_url']?.toString() ?? '',
                                             fit: BoxFit.cover,
@@ -169,23 +211,65 @@ class MediaLibraryPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _upload(WidgetRef ref) async {
+  Future<void> _ensureUploadFolder(WidgetRef ref) async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    final result = await FilePicker.platform
-        .pickFiles(allowMultiple: true, type: FileType.media);
+    final created = await ref
+        .read(vendorRepositoryProvider)
+        .createMediaFolder(vendorId, 'General');
+    final id = (created['id'] ?? created['folderId'])?.toString();
+    if (id != null) {
+      ref.read(mediaUploadFolderIdProvider.notifier).state = id;
+    }
+    ref.invalidate(vendorMediaFoldersProvider);
+  }
+
+  Future<void> _upload(BuildContext context, WidgetRef ref) async {
+    final vendorId = ref.read(vendorIdProvider);
+    if (vendorId == null) return;
+
+    var folderId = ref.read(mediaUploadFolderIdProvider);
+    final folders = await ref.read(vendorMediaFoldersProvider.future);
+    if (folderId == null || folderId.isEmpty) {
+      if (folders.isEmpty) {
+        await _ensureUploadFolder(ref);
+        folderId = ref.read(mediaUploadFolderIdProvider);
+      } else {
+        folderId = folders.first['id']?.toString();
+        ref.read(mediaUploadFolderIdProvider.notifier).state = folderId;
+      }
+    }
+    if (folderId == null || folderId.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Create a folder before uploading')),
+        );
+      }
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.any,
+    );
     if (result == null) return;
-    final folder = ref.read(mediaFolderProvider) == 'all'
-        ? 'general'
-        : ref.read(mediaFolderProvider);
     for (final file in result.files) {
       if (file.path == null) continue;
-      final type = (file.extension ?? '').toLowerCase().contains('mp4')
-          ? 'video'
-          : 'image';
-      await ref
-          .read(vendorRepositoryProvider)
-          .uploadMedia(vendorId, File(file.path!), file.name, folder, type);
+      final ext = (file.extension ?? '').toLowerCase();
+      final contentType = ext == 'pdf'
+          ? 'application/pdf'
+          : ext == 'png'
+              ? 'image/png'
+              : ext == 'webp'
+                  ? 'image/webp'
+                  : 'image/jpeg';
+      await ref.read(vendorRepositoryProvider).uploadMedia(
+            vendorId,
+            File(file.path!),
+            file.name,
+            folderId,
+            contentType,
+          );
     }
     ref.invalidate(vendorMediaProvider);
   }

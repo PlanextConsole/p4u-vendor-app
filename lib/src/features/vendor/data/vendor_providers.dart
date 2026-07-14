@@ -39,6 +39,24 @@ final vendorServicesProvider = FutureProvider((ref) async {
   return ref.watch(vendorRepositoryProvider).services(vendorId);
 });
 
+final serviceCategoriesProvider = FutureProvider((ref) async {
+  final vendorId = ref.watch(vendorIdProvider);
+  final vendor = ref.watch(currentVendorProvider);
+  if (vendorId == null || vendor?.hasServiceFlow != true) {
+    return <Map<String, dynamic>>[];
+  }
+  return ref.watch(vendorRepositoryProvider).serviceCategories(vendorId);
+});
+
+final catalogServiceItemsProvider = FutureProvider((ref) async {
+  final vendorId = ref.watch(vendorIdProvider);
+  final vendor = ref.watch(currentVendorProvider);
+  if (vendorId == null || vendor?.hasServiceFlow != true) {
+    return <Map<String, dynamic>>[];
+  }
+  return ref.watch(vendorRepositoryProvider).catalogServiceItems(vendorId);
+});
+
 final vendorOrdersProvider = FutureProvider((ref) async {
   final vendorId = ref.watch(vendorIdProvider);
   final vendor = ref.watch(currentVendorProvider);

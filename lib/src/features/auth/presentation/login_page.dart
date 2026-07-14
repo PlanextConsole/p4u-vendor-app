@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../../firebase_options.dart';
 import '../data/auth_repository.dart';
 
 class VendorLoginPage extends ConsumerStatefulWidget {
@@ -53,13 +54,15 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
       _snack('Please enter a valid 10-digit phone number');
       return;
     }
-    if (Firebase.apps.isEmpty) {
+    setState(() => _loading = true);
+    final firebaseReady = await _ensureFirebase();
+    if (!firebaseReady) {
+      if (mounted) setState(() => _loading = false);
       _snack(
-        'Firebase is not configured. Add SHA fingerprints in Firebase Console and replace android/app/google-services.json, then rebuild the app.',
+        'Firebase is not ready. Check google-services.json and try again.',
       );
       return;
     }
-    setState(() => _loading = true);
     try {
       await firebase.FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: '+91$digits',
@@ -87,6 +90,19 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
     } catch (e) {
       _snack('$e');
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<bool> _ensureFirebase() async {
+    if (Firebase.apps.isNotEmpty) return true;
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 8));
+      return Firebase.apps.isNotEmpty;
+    } catch (e) {
+      debugPrint('Firebase init failed before OTP: $e');
+      return false;
     }
   }
 

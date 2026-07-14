@@ -41,7 +41,9 @@ class ApiSession {
     return prefs.getString(_vendorIdKey);
   }
 
-  Future<bool> hasToken() async => (await accessToken())?.isNotEmpty == true;
+  Future<bool> hasToken() async =>
+      (await accessToken())?.isNotEmpty == true ||
+      (await refreshToken())?.isNotEmpty == true;
 
   Future<Map<String, dynamic>?> cachedProfile() async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,7 +79,6 @@ class ApiSession {
   Future<void> saveProfile(Map<String, dynamic> profile) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_profileKey, jsonEncode(profile));
-    _changes.add(null);
   }
 
   Future<void> clear() async {
@@ -104,7 +105,9 @@ class ApiClient {
   static Future<void> _requestQueue = Future.value();
 
   final ApiSession session;
-  final _http = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+  static const _requestTimeout = Duration(seconds: 12);
+
+  final _http = HttpClient()..connectionTimeout = const Duration(seconds: 8);
   Future<void>? _refreshInFlight;
 
   Future<Map<String, dynamic>> getJson(
@@ -161,7 +164,7 @@ class ApiClient {
     String? contentType,
     bool auth = true,
   }) async {
-    final request = await _http.postUrl(_uri(path));
+    final request = await _withTimeout(_http.postUrl(_uri(path)));
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     if (auth) await _attachAuth(request);
 
@@ -186,12 +189,12 @@ class ApiClient {
     request.add(await file.readAsBytes());
     request.write('\r\n--$boundary--\r\n');
 
-    return _decodeResponse(await request.close());
+    return _decodeResponse(await _withTimeout(request.close()));
   }
 
   Future<T> _runQueued<T>(Future<T> Function() action) {
     final queued = _requestQueue.then((_) async {
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 40));
       return action();
     });
     _requestQueue = queued.then((_) {}, onError: (_) {});
@@ -205,19 +208,24 @@ class ApiClient {
     Object? body,
     bool auth = false,
   }) async {
+    final isRead = method.toUpperCase() == 'GET';
+    Future<Map<String, dynamic>> run() {
+      Future<Map<String, dynamic>> action() =>
+          _sendOnce(method, path, query: query, body: body, auth: auth);
+      return isRead ? action() : _runQueued(action);
+    }
+
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        return await _runQueued(() =>
-            _sendOnce(method, path, query: query, body: body, auth: auth));
+        return await run();
       } on ApiException catch (e) {
         if (e.statusCode == 429 && attempt < 2) {
-          await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+          await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
           continue;
         }
         if (!auth || e.statusCode != 401) rethrow;
         await _refreshAuthDeduped();
-        return _runQueued(() =>
-            _sendOnce(method, path, query: query, body: body, auth: auth));
+        return run();
       }
     }
     throw const ApiException(
@@ -232,12 +240,13 @@ class ApiClient {
     Object? body,
     bool auth = false,
   }) async {
-    final request = await _http.openUrl(method, _uri(path, query));
+    final request =
+        await _withTimeout(_http.openUrl(method, _uri(path, query)));
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     request.headers.contentType = ContentType.json;
     if (auth) await _attachAuth(request);
     if (body != null) request.write(jsonEncode(body));
-    return _decodeResponse(await request.close());
+    return _decodeResponse(await _withTimeout(request.close()));
   }
 
   Future<void> _refreshAuthDeduped() {
@@ -256,21 +265,27 @@ class ApiClient {
           statusCode: 401);
     }
 
-    final request =
-        await _http.openUrl('POST', _uri('/api/auth/public/refresh'));
+    final request = await _withTimeout(
+        _http.openUrl('POST', _uri('/api/auth/public/refresh')));
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     request.headers.contentType = ContentType.json;
     request.write(jsonEncode({'refreshToken': refreshToken}));
 
     try {
-      final data = await _decodeResponse(await request.close());
+      final data = await _decodeResponse(await _withTimeout(request.close()));
       final auth = apiObject(data['auth'] ?? data['data'] ?? data) ?? data;
       await session.saveAuth(auth);
     } on ApiException {
-      await session.clear();
       rethrow;
     }
   }
+
+  Future<T> _withTimeout<T>(Future<T> future) => future.timeout(
+        _requestTimeout,
+        onTimeout: () => throw const ApiException(
+          'Network timeout. Please check your connection and try again.',
+        ),
+      );
 
   Uri _uri(String path, [Map<String, Object?> query = const {}]) {
     final base = Uri.parse(baseUrl);
@@ -297,7 +312,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> _decodeResponse(
       HttpClientResponse response) async {
-    final raw = await response.transform(utf8.decoder).join();
+    final raw = await _withTimeout(response.transform(utf8.decoder).join());
     final decoded = raw.isEmpty ? <String, dynamic>{} : jsonDecode(raw);
     final data = decoded is Map<String, dynamic>
         ? decoded

@@ -22,23 +22,10 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
     'Friday',
     'Saturday'
   ];
-  static const times = [
-    '06:00 AM',
-    '07:00 AM',
-    '08:00 AM',
-    '09:00 AM',
-    '10:00 AM',
-    '11:00 AM',
-    '12:00 PM',
-    '01:00 PM',
-    '02:00 PM',
-    '03:00 PM',
-    '04:00 PM',
-    '05:00 PM',
-    '06:00 PM',
-    '07:00 PM',
-    '08:00 PM',
-    '09:00 PM'
+  // 24h HH:MM in 30-minute steps — matches the web availability DTO format.
+  static final times = [
+    for (var h = 0; h < 24; h++)
+      for (final m in ['00', '30']) '${h.toString().padLeft(2, '0')}:$m'
   ];
 
   late List<Map<String, dynamic>> schedule = _defaults();
@@ -52,7 +39,7 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
             'is_available': i >= 1 && i <= 6,
             'time_slots': i >= 1 && i <= 6
                 ? [
-                    {'start': '09:00 AM', 'end': '06:00 PM'}
+                    {'start': '09:00', 'end': '18:00'}
                   ]
                 : [],
           });
@@ -120,8 +107,8 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
                                 TextButton.icon(
                                     onPressed: () => _mutate(() =>
                                         (day['time_slots'] as List).add({
-                                          'start': '09:00 AM',
-                                          'end': '05:00 PM'
+                                          'start': '09:00',
+                                          'end': '17:00'
                                         })),
                                     icon: const Icon(Icons.add_rounded),
                                     label: const Text('Add Slot')),
@@ -208,9 +195,13 @@ class _TimeDrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final options = [
+      if (!_AvailabilityPageState.times.contains(value)) value,
+      ..._AvailabilityPageState.times,
+    ];
     return DropdownButtonFormField<String>(
       initialValue: value,
-      items: _AvailabilityPageState.times
+      items: options
           .map((t) => DropdownMenuItem(
               value: t, child: Text(t, style: const TextStyle(fontSize: 12))))
           .toList(),
