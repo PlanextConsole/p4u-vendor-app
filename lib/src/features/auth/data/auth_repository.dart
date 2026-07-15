@@ -31,7 +31,10 @@ class AuthRepository {
       return VendorUser.fromApi(profile,
           fallbackId: await apiSession.vendorId());
     } on ApiException catch (e) {
-      if (e.statusCode == 401 || e.statusCode == 403) {
+      // 401 only reaches here after a failed silent refresh (session is truly
+      // dead) — clearing is correct. A 403 is a live-token authorization issue,
+      // NOT an expiry, so it must not log the user out; fall back to the cache.
+      if (e.statusCode == 401) {
         await apiSession.clear();
         return null;
       }

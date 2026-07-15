@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/auth/presentation/register_page.dart';
+import 'features/auth/presentation/splash_gate.dart';
 import 'features/vendor/presentation/pages/availability_page.dart';
 import 'features/vendor/presentation/pages/bank_accounts_page.dart';
 import 'features/vendor/presentation/pages/bookings_page.dart';
@@ -20,8 +21,9 @@ import 'features/vendor/presentation/pages/simple_vendor_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(path: '/splash', builder: (_, __) => const VendorSplashGate()),
       GoRoute(path: '/login', builder: (_, __) => const VendorLoginPage()),
       GoRoute(
           path: '/register', builder: (_, __) => const VendorRegisterPage()),
