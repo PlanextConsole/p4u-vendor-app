@@ -18,7 +18,6 @@ enum SimpleVendorKind {
   wallet,
   accountControl
 }
-
 class SimpleVendorPage extends ConsumerWidget {
   const SimpleVendorPage({required this.kind, super.key});
 
@@ -324,9 +323,45 @@ class _NotificationsPage extends ConsumerWidget {
   }
 }
 
-class _SettingsPage extends ConsumerStatefulWidget {
+class _SettingsPage extends ConsumerWidget {
   @override
-  ConsumerState<_SettingsPage> createState() => _SettingsPageState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return VendorScaffold(
+      title: 'Settings',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Account Control',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                const Text(
+                    'Deactivate or request deletion of your vendor account from the support team.',
+                    style: TextStyle(color: Colors.black54)),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                    onPressed: () => context.go('/account-control'),
+                    icon: const Icon(Icons.warning_amber_rounded),
+                    label: const Text('Request Account Action')),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await ref.read(authRepositoryProvider).signOut();
+              if (context.mounted) context.go('/login');
+            },
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _WalletPage extends ConsumerWidget {
@@ -442,116 +477,5 @@ class _AccountControlPage extends ConsumerWidget {
     }
     await ref.read(authRepositoryProvider).signOut();
     if (context.mounted) context.go('/login');
-  }
-}
-
-class _SettingsPageState extends ConsumerState<_SettingsPage> {
-  final currentPassword = TextEditingController();
-  final password = TextEditingController();
-  final confirm = TextEditingController();
-  bool saving = false;
-
-  @override
-  void dispose() {
-    currentPassword.dispose();
-    password.dispose();
-    confirm.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return VendorScaffold(
-      title: 'Settings',
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Change Password',
-                    style: TextStyle(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: currentPassword,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                        labelText: 'Current password')),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: password,
-                    obscureText: true,
-                    decoration:
-                        const InputDecoration(labelText: 'New password')),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: confirm,
-                    obscureText: true,
-                    decoration:
-                        const InputDecoration(labelText: 'Confirm password')),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: saving ? null : _changePassword,
-                  child: Text(saving ? 'Updating...' : 'Update Password'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Account Control',
-                    style: TextStyle(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                const Text(
-                    'Deactivate or request deletion of your vendor account from the support team.',
-                    style: TextStyle(color: Colors.black54)),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                    onPressed: () => context.go('/account-control'),
-                    icon: const Icon(Icons.warning_amber_rounded),
-                    label: const Text('Request Account Action')),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await ref.read(authRepositoryProvider).signOut();
-              if (context.mounted) context.go('/login');
-            },
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _changePassword() async {
-    if (currentPassword.text.isEmpty ||
-        password.text.length < 6 ||
-        password.text != confirm.text) {
-      return;
-    }
-    setState(() => saving = true);
-    try {
-      await ref.read(authRepositoryProvider).updatePassword(
-            currentPassword.text,
-            password.text,
-          );
-      if (mounted) {
-        currentPassword.clear();
-        password.clear();
-        confirm.clear();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Password updated')));
-      }
-    } finally {
-      if (mounted) setState(() => saving = false);
-    }
   }
 }

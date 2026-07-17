@@ -17,36 +17,11 @@ class VendorLoginPage extends ConsumerStatefulWidget {
 }
 
 class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
   final _phone = TextEditingController();
   final _otp = TextEditingController();
-  bool _showPassword = false;
   bool _loading = false;
   bool _otpSent = false;
-  bool _passwordMode = false;
   String? _verificationId;
-
-  Future<void> _submit() async {
-    if (_email.text.trim().isEmpty || _password.text.isEmpty) {
-      _snack('Please enter email and password');
-      return;
-    }
-    setState(() => _loading = true);
-    try {
-      await ref
-          .read(authRepositoryProvider)
-          .signInWithPassword(_email.text.trim(), _password.text);
-      if (mounted) context.go('/');
-    } catch (e) {
-      _snack(e
-          .toString()
-          .replaceFirst('AuthException(message: ', '')
-          .replaceFirst(', statusCode: null)', ''));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
 
   Future<void> _sendOtp() async {
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
@@ -166,83 +141,6 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _modeSwitch() {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(26),
-        color: AppColors.productSurface,
-      ),
-      child: Row(
-        children: [
-          _modeButton(
-              label: 'Phone OTP',
-              icon: Icons.phone_rounded,
-              selected: !_passwordMode,
-              onTap: () => _setMode(false)),
-          _modeButton(
-              label: 'Password',
-              icon: Icons.mail_outline_rounded,
-              selected: _passwordMode,
-              onTap: () => _setMode(true)),
-        ],
-      ),
-    );
-  }
-
-  Widget _modeButton({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          height: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.softGreen : Colors.transparent,
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(selected ? Icons.check_rounded : icon,
-                  size: 18, color: AppColors.brandDark),
-              const SizedBox(width: 6),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _setMode(bool passwordMode) {
-    setState(() {
-      _passwordMode = passwordMode;
-      _otpSent = false;
-      _otp.clear();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen(authStateProvider, (_, next) {
@@ -330,36 +228,14 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                         padding: const EdgeInsets.all(22),
                         child: Column(
                           children: [
-                            _modeSwitch(),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Phone OTP sign-in',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w800)),
+                            ),
                             const SizedBox(height: 16),
-                            if (_passwordMode) ...[
-                              TextField(
-                                controller: _email,
-                                keyboardType: TextInputType.emailAddress,
-                                decoration: const InputDecoration(
-                                    prefixIcon:
-                                        Icon(Icons.mail_outline_rounded),
-                                    hintText: 'Vendor Email'),
-                              ),
-                              const SizedBox(height: 14),
-                              TextField(
-                                controller: _password,
-                                obscureText: !_showPassword,
-                                decoration: InputDecoration(
-                                  prefixIcon:
-                                      const Icon(Icons.lock_outline_rounded),
-                                  hintText: 'Password',
-                                  suffixIcon: IconButton(
-                                    onPressed: () => setState(
-                                        () => _showPassword = !_showPassword),
-                                    icon: Icon(_showPassword
-                                        ? Icons.visibility_off_rounded
-                                        : Icons.visibility_rounded),
-                                  ),
-                                ),
-                                onSubmitted: (_) => _submit(),
-                              ),
-                            ] else if (!_otpSent) ...[
+                            if (!_otpSent) ...[
                               TextField(
                                 controller: _phone,
                                 keyboardType: TextInputType.phone,
@@ -393,27 +269,21 @@ class _VendorLoginPageState extends ConsumerState<VendorLoginPage> {
                             FilledButton.icon(
                               onPressed: _loading
                                   ? null
-                                  : (_passwordMode
-                                      ? _submit
-                                      : (_otpSent ? _verifyOtp : _sendOtp)),
+                                  : (_otpSent ? _verifyOtp : _sendOtp),
                               icon: _loading
                                   ? const SizedBox(
                                       width: 18,
                                       height: 18,
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2, color: Colors.white))
-                                  : Icon(_passwordMode
-                                      ? Icons.login_rounded
-                                      : (_otpSent
-                                          ? Icons.verified_user_rounded
-                                          : Icons.arrow_forward_rounded)),
+                                  : Icon(_otpSent
+                                      ? Icons.verified_user_rounded
+                                      : Icons.arrow_forward_rounded),
                               label: Text(_loading
                                   ? 'Please wait...'
-                                  : (_passwordMode
-                                      ? 'Sign In'
-                                      : (_otpSent
-                                          ? 'Verify OTP'
-                                          : 'Send OTP'))),
+                                  : (_otpSent
+                                      ? 'Verify OTP'
+                                      : 'Send OTP')),
                               style: FilledButton.styleFrom(
                                   minimumSize: const Size.fromHeight(52)),
                             ),
