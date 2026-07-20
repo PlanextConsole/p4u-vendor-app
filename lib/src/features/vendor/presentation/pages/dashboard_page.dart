@@ -125,7 +125,7 @@ class DashboardPage extends ConsumerWidget {
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w800))),
                           TextButton(
-                              onPressed: () => context.go(activityPath),
+                              onPressed: () => context.push(activityPath),
                               child: const Text('View All')),
                         ],
                       ),
@@ -209,7 +209,7 @@ class _QuickLink extends StatelessWidget {
     return SizedBox(
       width: 112,
       child: AppCard(
-        onTap: () => context.go(path),
+        onTap: () => context.push(path),
         child: Column(
           children: [
             Icon(icon, color: AppColors.primary),
@@ -271,13 +271,13 @@ String _activityTitle(Map<String, dynamic> row, String activityLabel) {
 /// Last 7 calendar days of non-cancelled order totals (x = 0..6 oldest→newest).
 List<FlSpot> _weekRevenueSpots(List<Map<String, dynamic>> orders) {
   final now = DateTime.now();
-  final start = DateTime(now.year, now.month, now.day)
-      .subtract(const Duration(days: 6));
+  final start =
+      DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
   final totals = List<double>.filled(7, 0);
   for (final o in orders) {
     if (o['status']?.toString() == 'cancelled') continue;
-    final created = DateTime.tryParse(
-        '${o['created_at'] ?? o['createdAt'] ?? ''}');
+    final created =
+        DateTime.tryParse('${o['created_at'] ?? o['createdAt'] ?? ''}');
     if (created == null) continue;
     final day = DateTime(created.year, created.month, created.day);
     final idx = day.difference(start).inDays;

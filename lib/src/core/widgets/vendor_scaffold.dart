@@ -49,6 +49,7 @@ class VendorScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.path;
+    final isDashboard = location == '/';
     final auth = ref.watch(authStateProvider);
     final vendor = auth.valueOrNull;
     if (!auth.isLoading && vendor == null) {
@@ -62,44 +63,76 @@ class VendorScaffold extends ConsumerWidget {
     }
     final destinations = _bottomDestinationsFor(vendor);
     final current = destinations.indexWhere((d) => d.path == location);
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.softGreen, // soft teal brand tile
-                borderRadius: BorderRadius.circular(8),
+    return PopScope(
+      // Routes reached with go (for example a restored/deep-linked module)
+      // have no page beneath them. Intercept Back and return to Dashboard.
+      canPop: isDashboard || context.canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && !isDashboard) context.go('/');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: isDashboard
+              ? null
+              : IconButton(
+                  tooltip: 'Back',
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded),
+                ),
+          titleSpacing: 16,
+          title: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: AppColors.softGreen, // soft teal brand tile
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Image.asset('assets/images/p4u-logo.png',
+                    fit: BoxFit.contain),
               ),
-              child: Image.asset('assets/images/p4u-logo.png',
-                  fit: BoxFit.contain),
+              const SizedBox(width: 8),
+              Flexible(
+                child:
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          actions: [
+            if (!isDashboard)
+              Builder(
+                builder: (scaffoldContext) => IconButton(
+                  tooltip: 'Menu',
+                  onPressed: () => Scaffold.of(scaffoldContext).openDrawer(),
+                  icon: const Icon(Icons.menu_rounded),
+                ),
+              ),
+            IconButton(
+              tooltip: 'Notifications',
+              onPressed: location == '/notifications'
+                  ? null
+                  : () => context.push('/notifications'),
+              icon: const Icon(Icons.notifications_none_rounded),
             ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
+            ...actions,
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: () => context.go('/notifications'),
-            icon: const Icon(Icons.notifications_none_rounded),
-          ),
-          ...actions,
-        ],
+        drawer: _VendorDrawer(activePath: location),
+        body: SafeArea(child: child),
+        bottomNavigationBar: _VendorBottomNav(
+          destinations: destinations,
+          selectedIndex: current < 0 ? 0 : current,
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      drawer: _VendorDrawer(activePath: location),
-      body: SafeArea(child: child),
-      bottomNavigationBar: _VendorBottomNav(
-        destinations: destinations,
-        selectedIndex: current < 0 ? 0 : current,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 }
@@ -132,7 +165,12 @@ class _VendorBottomNav extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18),
                   onTap: () {
                     if (index != selectedIndex) {
-                      context.go(destinations[index].path);
+                      final path = destinations[index].path;
+                      if (path == '/') {
+                        context.go(path);
+                      } else {
+                        context.push(path);
+                      }
                     }
                   },
                   child: Column(
@@ -284,7 +322,11 @@ class _VendorDrawer extends ConsumerWidget {
                           title: Text(item.label),
                           onTap: () {
                             Navigator.pop(context);
-                            context.go(item.path);
+                            if (item.path == '/') {
+                              context.go(item.path);
+                            } else if (item.path != activePath) {
+                              context.push(item.path);
+                            }
                           },
                         ))
                     .toList(),

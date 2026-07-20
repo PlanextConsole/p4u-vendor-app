@@ -29,8 +29,15 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
   ];
 
   late List<Map<String, dynamic>> schedule = _defaults();
-  bool loaded = false;
+  late Future<void> _loadFuture;
   bool changed = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFuture = _load();
+  }
 
   List<Map<String, dynamic>> _defaults() => List.generate(
       7,
@@ -45,7 +52,6 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
           });
 
   Future<void> _load() async {
-    if (loaded) return;
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
     final rows =
@@ -62,7 +68,10 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
       }
       schedule = defaults;
     }
-    loaded = true;
+  }
+
+  void _retryLoad() {
+    setState(() => _loadFuture = _load());
   }
 
   @override
@@ -71,15 +80,43 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
       title: 'Availability',
       actions: [
         IconButton(
-          onPressed: changed ? _save : null,
-          icon: const Icon(Icons.save_rounded),
+          onPressed: changed && !_saving ? _save : null,
+          icon: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.save_rounded),
         ),
       ],
       child: FutureBuilder(
-        future: _load(),
+        future: _loadFuture,
         builder: (_, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded, size: 44),
+                    const SizedBox(height: 12),
+                    Text(snapshot.error.toString(),
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _retryLoad,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -181,10 +218,23 @@ class _AvailabilityPageState extends ConsumerState<AvailabilityPage> {
   Future<void> _save() async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return;
-    await ref
-        .read(vendorRepositoryProvider)
-        .saveAvailability(vendorId, schedule);
-    setState(() => changed = false);
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(vendorRepositoryProvider)
+          .saveAvailability(vendorId, schedule);
+      if (!mounted) return;
+      setState(() => changed = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Availability saved')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 }
 

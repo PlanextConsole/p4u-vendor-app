@@ -18,6 +18,7 @@ enum SimpleVendorKind {
   wallet,
   accountControl
 }
+
 class SimpleVendorPage extends ConsumerWidget {
   const SimpleVendorPage({required this.kind, super.key});
 
@@ -86,18 +87,49 @@ class _AnalyticsPage extends ConsumerWidget {
   }
 }
 
-class _ReviewsPage extends ConsumerWidget {
+class _ReviewsPage extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ReviewsPage> createState() => _ReviewsPageState();
+}
+
+class _ReviewsPageState extends ConsumerState<_ReviewsPage> {
+  late Future<List<Map<String, dynamic>>> _reviewsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reviewsFuture = _reviews();
+  }
+
+  void _retry() => setState(() => _reviewsFuture = _reviews());
+
+  @override
+  Widget build(BuildContext context) {
     return VendorScaffold(
       title: 'Reviews',
-      child: FutureBuilder(
-        future: _reviews(ref),
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _reviewsFuture,
         builder: (_, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          final rows = snapshot.data!;
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _retry,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+          final rows = snapshot.data ?? const <Map<String, dynamic>>[];
           if (rows.isEmpty) {
             return const Padding(
                 padding: EdgeInsets.all(16),
@@ -126,7 +158,7 @@ class _ReviewsPage extends ConsumerWidget {
     );
   }
 
-  Future<List<Map<String, dynamic>>> _reviews(WidgetRef ref) async {
+  Future<List<Map<String, dynamic>>> _reviews() async {
     final vendorId = ref.read(vendorIdProvider);
     if (vendorId == null) return [];
     final client = ref.read(vendorRepositoryProvider);
@@ -343,7 +375,7 @@ class _SettingsPage extends ConsumerWidget {
                     style: TextStyle(color: Colors.black54)),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                    onPressed: () => context.go('/account-control'),
+                    onPressed: () => context.push('/account-control'),
                     icon: const Icon(Icons.warning_amber_rounded),
                     label: const Text('Request Account Action')),
               ],

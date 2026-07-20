@@ -49,12 +49,21 @@ class ApiSession {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_profileKey);
     if (raw == null || raw.isEmpty) return null;
-    final decoded = jsonDecode(raw);
-    return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } on FormatException {
+      // A partially-written/corrupt cache must not prevent app startup.
+      await prefs.remove(_profileKey);
+      return null;
+    }
   }
 
-  Future<void> saveAuth(Map<String, dynamic> data,
-      {Map<String, dynamic>? profile}) async {
+  Future<void> saveAuth(
+    Map<String, dynamic> data, {
+    Map<String, dynamic>? profile,
+    bool notify = true,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final access = data['accessToken'] ?? data['access_token'];
     final refresh = data['refreshToken'] ?? data['refresh_token'];
@@ -73,7 +82,7 @@ class ApiSession {
     if (profile != null) {
       await prefs.setString(_profileKey, jsonEncode(profile));
     }
-    _changes.add(null);
+    if (notify) _changes.add(null);
   }
 
   Future<void> saveProfile(Map<String, dynamic> profile) async {
@@ -102,13 +111,13 @@ class ApiClient {
     defaultValue: 'https://api.planext4u.com',
   );
 
-  static Future<void> _requestQueue = Future.value();
+  static Future<void>? _refreshInFlight;
 
   final ApiSession session;
-  static const _requestTimeout = Duration(seconds: 12);
+  static const _requestTimeout = Duration(seconds: 30);
+  static const _uploadTimeout = Duration(minutes: 2);
 
-  final _http = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-  Future<void>? _refreshInFlight;
+  final _http = HttpClient()..connectionTimeout = const Duration(seconds: 20);
 
   Future<Map<String, dynamic>> getJson(
     String path, {
@@ -164,6 +173,32 @@ class ApiClient {
     String? contentType,
     bool auth = true,
   }) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await _withUploadTimeout(_uploadFileOnce(
+          path,
+          file,
+          field: field,
+          fields: fields,
+          contentType: contentType,
+          auth: auth,
+        ));
+      } on ApiException catch (e) {
+        if (!auth || e.statusCode != 401 || attempt > 0) rethrow;
+        await _refreshAuthDeduped();
+      }
+    }
+    throw const ApiException('Upload failed');
+  }
+
+  Future<Map<String, dynamic>> _uploadFileOnce(
+    String path,
+    File file, {
+    required String field,
+    required Map<String, Object?> fields,
+    String? contentType,
+    required bool auth,
+  }) async {
     final request = await _withTimeout(_http.postUrl(_uri(path)));
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     if (auth) await _attachAuth(request);
@@ -186,19 +221,11 @@ class ApiClient {
         'Content-Disposition: form-data; name="$field"; filename="$fileName"\r\n');
     request.write(
         'Content-Type: ${contentType ?? 'application/octet-stream'}\r\n\r\n');
-    request.add(await file.readAsBytes());
+    // Stream from disk so large product/KYC files do not exhaust Android heap.
+    await request.addStream(file.openRead());
     request.write('\r\n--$boundary--\r\n');
 
     return _decodeResponse(await _withTimeout(request.close()));
-  }
-
-  Future<T> _runQueued<T>(Future<T> Function() action) {
-    final queued = _requestQueue.then((_) async {
-      await Future.delayed(const Duration(milliseconds: 40));
-      return action();
-    });
-    _requestQueue = queued.then((_) {}, onError: (_) {});
-    return queued;
   }
 
   Future<Map<String, dynamic>> _send(
@@ -208,16 +235,15 @@ class ApiClient {
     Object? body,
     bool auth = false,
   }) async {
-    final isRead = method.toUpperCase() == 'GET';
-    Future<Map<String, dynamic>> run() {
-      Future<Map<String, dynamic>> action() =>
-          _sendOnce(method, path, query: query, body: body, auth: auth);
-      return isRead ? action() : _runQueued(action);
-    }
-
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        return await run();
+        return await _sendOnce(
+          method,
+          path,
+          query: query,
+          body: body,
+          auth: auth,
+        );
       } on ApiException catch (e) {
         if (e.statusCode == 429 && attempt < 2) {
           await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
@@ -225,7 +251,13 @@ class ApiClient {
         }
         if (!auth || e.statusCode != 401) rethrow;
         await _refreshAuthDeduped();
-        return run();
+        return _sendOnce(
+          method,
+          path,
+          query: query,
+          body: body,
+          auth: auth,
+        );
       }
     }
     throw const ApiException(
@@ -274,7 +306,9 @@ class ApiClient {
     try {
       final data = await _decodeResponse(await _withTimeout(request.close()));
       final auth = apiObject(data['auth'] ?? data['data'] ?? data) ?? data;
-      await session.saveAuth(auth);
+      // Refreshing a token is an implementation detail. Broadcasting it as a
+      // login event rebuilds the router and active data screens mid-request.
+      await session.saveAuth(auth, notify: false);
     } on ApiException {
       rethrow;
     }
@@ -284,6 +318,13 @@ class ApiClient {
         _requestTimeout,
         onTimeout: () => throw const ApiException(
           'Network timeout. Please check your connection and try again.',
+        ),
+      );
+
+  Future<T> _withUploadTimeout<T>(Future<T> future) => future.timeout(
+        _uploadTimeout,
+        onTimeout: () => throw const ApiException(
+          'Upload timed out. Check your connection and try again.',
         ),
       );
 
