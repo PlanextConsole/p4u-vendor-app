@@ -204,7 +204,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
 Future<void> _showProductForm(BuildContext context, WidgetRef ref,
     {Map<String, dynamic>? item}) async {
   final vendorId = ref.read(vendorIdProvider);
-  if (vendorId == null) return;
+  if (vendorId == null || vendorId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Vendor session is not ready. Please sign in again.'),
+      ),
+    );
+    return;
+  }
+  final editingId = item?['id']?.toString();
   if (item != null && item['id'] != null) {
     try {
       item = await ref
@@ -401,52 +409,89 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref,
                     sku.text.trim().isEmpty ||
                     price.text.trim().isEmpty ||
                     stock.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Title, SKU, price and stock are required.'),
+                    ),
+                  );
                   return;
                 }
-                await ref.read(vendorRepositoryProvider).upsertProduct(
-                      vendorId,
-                      {
-                        'title': title.text.trim(),
-                        'sku': sku.text.trim(),
-                        'price': price.text.trim(),
-                        'tax': tax.text.trim(),
-                        'discount': discount.text.trim(),
-                        'stock': stock.text.trim(),
-                        'short_description': shortDescription.text.trim(),
-                        'long_description': longDescription.text.trim(),
-                        'description': longDescription.text.trim(),
-                        'image': image.text.trim().isEmpty
-                            ? null
-                            : image.text.trim(),
-                        'images': image.text.trim().isEmpty
-                            ? <String>[]
-                            : <String>[image.text.trim()],
-                        'thumbnail_image': thumbnail.text.trim().isEmpty
-                            ? null
-                            : thumbnail.text.trim(),
-                        'banner_image': banner.text.trim().isEmpty
-                            ? null
-                            : banner.text.trim(),
-                        'youtube_video_url': youtube.text.trim(),
-                        'category_id': category.text.trim().isEmpty
-                            ? null
-                            : category.text.trim(),
-                        'subcategory_id': subcategory.text.trim().isEmpty
-                            ? null
-                            : subcategory.text.trim(),
-                        'parent_item_id': parentItem.text.trim().isEmpty
-                            ? null
-                            : parentItem.text.trim(),
-                        'product_type': productType,
-                        'variations': productType == 'variable'
-                            ? _parseVariationLines(variations.text)
-                            : <Map<String, dynamic>>[],
-                        'status': item == null ? 'pending_approval' : status,
-                      },
-                      id: item?['id']?.toString(),
+                final parsedPrice = double.tryParse(price.text.trim());
+                final parsedStock = int.tryParse(stock.text.trim());
+                if (parsedPrice == null ||
+                    parsedPrice < 0 ||
+                    parsedStock == null ||
+                    parsedStock < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enter a valid price and stock quantity.'),
+                    ),
+                  );
+                  return;
+                }
+                try {
+                  await ref.read(vendorRepositoryProvider).upsertProduct(
+                        vendorId,
+                        {
+                          'title': title.text.trim(),
+                          'sku': sku.text.trim(),
+                          'price': price.text.trim(),
+                          'tax': tax.text.trim(),
+                          'discount': discount.text.trim(),
+                          'stock': stock.text.trim(),
+                          'short_description': shortDescription.text.trim(),
+                          'long_description': longDescription.text.trim(),
+                          'description': longDescription.text.trim(),
+                          'image': image.text.trim().isEmpty
+                              ? null
+                              : image.text.trim(),
+                          'images': image.text.trim().isEmpty
+                              ? <String>[]
+                              : <String>[image.text.trim()],
+                          'thumbnail_image': thumbnail.text.trim().isEmpty
+                              ? null
+                              : thumbnail.text.trim(),
+                          'banner_image': banner.text.trim().isEmpty
+                              ? null
+                              : banner.text.trim(),
+                          'youtube_video_url': youtube.text.trim(),
+                          'category_id': category.text.trim().isEmpty
+                              ? null
+                              : category.text.trim(),
+                          'subcategory_id': subcategory.text.trim().isEmpty
+                              ? null
+                              : subcategory.text.trim(),
+                          'parent_item_id': parentItem.text.trim().isEmpty
+                              ? null
+                              : parentItem.text.trim(),
+                          'product_type': productType,
+                          'variations': productType == 'variable'
+                              ? _parseVariationLines(variations.text)
+                              : <Map<String, dynamic>>[],
+                          'status': item == null ? 'pending_approval' : status,
+                          'metadata': item?['metadata'],
+                        },
+                        id: editingId,
+                      );
+                  ref.invalidate(vendorProductsProvider);
+                  if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(item == null
+                            ? 'Product submitted for approval.'
+                            : 'Product updated successfully.'),
+                      ),
                     );
-                ref.invalidate(vendorProductsProvider);
-                if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  }
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Could not save product: $error')),
+                    );
+                  }
+                }
               },
               child:
                   Text(item == null ? 'Submit for Approval' : 'Update Product'),

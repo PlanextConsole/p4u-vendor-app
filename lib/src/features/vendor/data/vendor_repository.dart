@@ -105,7 +105,7 @@ class VendorRepository {
   Future<void> upsertProduct(String vendorId, Map<String, dynamic> values,
       {String? id}) async {
     final payload = _productPayload(values);
-    if (id == null) {
+    if (id == null || id.trim().isEmpty) {
       await _api.postJson('/api/v1/vendor/me/products',
           body: payload, auth: true);
     } else {
@@ -750,9 +750,21 @@ class VendorRepository {
     final existingMeta = values['metadata'] is Map
         ? Map<String, dynamic>.from(values['metadata'] as Map)
         : <String, dynamic>{};
+    final categoryId = values.s(
+      'subcategory_id',
+      values.s(
+        'subcategoryId',
+        values.s('category_id', values.s('categoryId')),
+      ),
+    );
+    final thumbnail = values.s(
+      'thumbnail_image',
+      values.s('thumbnailUrl', values.s('image')),
+    );
+    final banner = values.s('banner_image', values.s('bannerUrl'));
     return {
-      'name': values.s('title', values.s('name')),
-      'categoryId': values.s('category_id', values.s('categoryId')),
+      'name': values.s('title', values.s('name')).trim(),
+      'categoryId': _nullIfEmpty(categoryId),
       if (values
           .s('taxConfigurationId', values.s('tax_configuration_id'))
           .isNotEmpty)
@@ -761,19 +773,29 @@ class VendorRepository {
       'sellPrice': price.toStringAsFixed(2),
       'discountAmount': discount.toStringAsFixed(2),
       'finalPrice': (finalPrice < 0 ? 0 : finalPrice).toStringAsFixed(2),
-      'shortDescription':
-          values.s('short_description', values.s('shortDescription')),
-      'longDescription':
-          values.s('long_description', values.s('longDescription')),
-      'thumbnailUrl': values.s('image', values.s('thumbnailUrl')),
+      'shortDescription': _nullIfEmpty(
+          values.s('short_description', values.s('shortDescription'))),
+      'longDescription': _nullIfEmpty(
+          values.s('long_description', values.s('longDescription'))),
+      'thumbnailUrl': _nullIfEmpty(thumbnail),
+      'bannerUrls': banner.isEmpty ? <String>[] : <String>[banner],
+      'description':
+          _nullIfEmpty(values.s('description', values.s('long_description'))),
+      'price': price.toStringAsFixed(2),
       'isActive': values.s('status', 'active') == 'active',
       'metadata': {
         ...existingMeta,
         'sku': values.s('sku', existingMeta.s('sku')),
-        'productType': values.s('product_type',
-            values.s('productType', existingMeta.s('productType', 'simple'))),
+        'productType': values.s(
+          'product_type',
+          values.s('productType', existingMeta.s('productType', 'simple')),
+        ),
         'quantity': stock,
         'stock': stock,
+        'taxAmount': values.s('tax', existingMeta.s('taxAmount')),
+        'youtubeVideoUrl': _nullIfEmpty(values.s('youtube_video_url')),
+        'parentItemId': _nullIfEmpty(values.s('parent_item_id')),
+        'subcategoryId': _nullIfEmpty(values.s('subcategory_id')),
       },
       if (values['variations'] is List) 'variations': values['variations'],
     };
@@ -932,9 +954,24 @@ class VendorRepository {
       'title': row.s('title', row.s('name')),
       'price': row.n('price', row.n('sellPrice', row.n('finalPrice'))),
       'discount': row.n('discount', row.n('discountAmount')),
-      'stock': row.i('stock',
-          row.i('availableStock', meta.i('quantity', meta.i('stock')))),
+      'tax': row.n('tax', meta.n('taxAmount')),
+      'stock': row.i(
+        'stock',
+        row.i('availableStock', meta.i('quantity', meta.i('stock'))),
+      ),
       'category_id': row.s('categoryId', row.s('category_id')),
+      'subcategory_id': meta.s('subcategoryId'),
+      'parent_item_id': meta.s('parentItemId'),
+      'sku': row.s('sku', meta.s('sku')),
+      'short_description':
+          row.s('shortDescription', row.s('short_description')),
+      'long_description': row.s(
+        'longDescription',
+        row.s('long_description', row.s('description')),
+      ),
+      'thumbnail_image': row.s('thumbnailUrl', row.s('thumbnail_url')),
+      'banner_image': _imageFrom(row, const ['bannerUrls', 'banner_urls']),
+      'youtube_video_url': meta.s('youtubeVideoUrl'),
       'image': _resolveUrl(_imageFrom(row, const [
         'image',
         'imageUrl',
