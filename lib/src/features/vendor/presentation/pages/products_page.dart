@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -203,6 +205,16 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref,
     {Map<String, dynamic>? item}) async {
   final vendorId = ref.read(vendorIdProvider);
   if (vendorId == null) return;
+  if (item != null && item['id'] != null) {
+    try {
+      item = await ref
+          .read(vendorRepositoryProvider)
+          .product(item['id'].toString());
+    } catch (_) {
+      // Keep the list row as an offline-safe edit fallback.
+    }
+  }
+  if (!context.mounted) return;
   final title = TextEditingController(text: item?['title']?.toString() ?? '');
   final sku = TextEditingController(text: item?['sku']?.toString() ?? '');
   final price = TextEditingController(text: item?['price']?.toString() ?? '');
@@ -227,6 +239,8 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref,
       TextEditingController(text: item?['subcategory_id']?.toString() ?? '');
   final parentItem =
       TextEditingController(text: item?['parent_item_id']?.toString() ?? '');
+  final variations =
+      TextEditingController(text: _variationText(item?['variations']));
   var productType = item?['product_type']?.toString() ?? 'simple';
   var status = item?['status']?.toString() ?? 'draft';
   await showModalBottomSheet(
@@ -358,6 +372,18 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref,
               onChanged: (v) => productType = v ?? productType,
             ),
             const SizedBox(height: 10),
+            TextField(
+              controller: variations,
+              minLines: 3,
+              maxLines: 7,
+              decoration: const InputDecoration(
+                labelText: 'Variation rows',
+                helperText:
+                    'Variable products: attributes; SKU; price; stock. Example: Color=Red, Size=M; RED-M; 499; 10',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: status,
               decoration: const InputDecoration(labelText: 'Status'),
@@ -412,6 +438,9 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref,
                             ? null
                             : parentItem.text.trim(),
                         'product_type': productType,
+                        'variations': productType == 'variable'
+                            ? _parseVariationLines(variations.text)
+                            : <Map<String, dynamic>>[],
                         'status': item == null ? 'pending_approval' : status,
                       },
                       id: item?['id']?.toString(),
@@ -427,6 +456,54 @@ Future<void> _showProductForm(BuildContext context, WidgetRef ref,
       ),
     ),
   );
+}
+
+String _variationText(Object? raw) {
+  if (raw is! List) return '';
+  return raw.whereType<Map>().map((row) {
+    final attrs = row['attributes'] is Map
+        ? Map<String, dynamic>.from(row['attributes'] as Map)
+        : <String, dynamic>{};
+    final attrText = attrs.entries
+        .map((e) => e.key.toString() + '=' + e.value.toString())
+        .join(', ');
+    return attrText +
+        '; ' +
+        (row['sku'] ?? '').toString() +
+        '; ' +
+        (row['sellPrice'] ?? row['finalPrice'] ?? '').toString() +
+        '; ' +
+        (row['quantity'] ?? 0).toString();
+  }).join('\n');
+}
+
+List<Map<String, dynamic>> _parseVariationLines(String raw) {
+  final rows = <Map<String, dynamic>>[];
+  for (final line in raw.split('\n')) {
+    final parts = line.split(';').map((v) => v.trim()).toList();
+    if (parts.isEmpty || parts.first.isEmpty) continue;
+    final attributes = <String, String>{};
+    for (final pair in parts.first.split(',')) {
+      final index = pair.indexOf('=');
+      if (index <= 0) continue;
+      final key = pair.substring(0, index).trim();
+      final value = pair.substring(index + 1).trim();
+      if (key.isNotEmpty && value.isNotEmpty) attributes[key] = value;
+    }
+    if (attributes.isEmpty) continue;
+    final price = parts.length > 2 ? double.tryParse(parts[2]) ?? 0 : 0;
+    rows.add({
+      'attributes': attributes,
+      'sku': parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null,
+      'sellPrice': price,
+      'finalPrice': price,
+      'discountAmount': 0,
+      'quantity': parts.length > 3 ? int.tryParse(parts[3]) ?? 0 : 0,
+      'isActive': true,
+      'sortOrder': rows.length,
+    });
+  }
+  return rows;
 }
 
 Future<String?> pickVendorImage(

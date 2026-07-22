@@ -187,6 +187,12 @@ class DashboardPage extends ConsumerWidget {
                     _QuickLink('Payments', '/payments', Icons.history_rounded),
                     _QuickLink(
                         'Bank A/C', '/bank', Icons.account_balance_rounded),
+                    if (!isServiceOnly)
+                      _QuickLink('Dropship', '/dropshipping',
+                          Icons.local_shipping_rounded),
+                    _QuickLink('KYC', '/kyc', Icons.verified_user_rounded),
+                    _QuickLink(
+                        'Plans', '/plans', Icons.workspace_premium_rounded),
                   ],
                 ),
               ],

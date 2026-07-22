@@ -252,6 +252,33 @@ class _Section extends ConsumerWidget {
     }
     await ref.read(vendorRepositoryProvider).completeBooking(
         booking['id'].toString(), File(photo!.path), notes.text.trim());
+    if (!context.mounted) return;
+    final otpController = TextEditingController();
+    final otp = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+              title: const Text('Customer completion OTP'),
+              content: TextField(
+                  controller: otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(labelText: '6-digit OTP')),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Later')),
+                FilledButton(
+                    onPressed: () =>
+                        Navigator.pop(context, otpController.text.trim()),
+                    child: const Text('Verify'))
+              ],
+            ));
+    otpController.dispose();
+    if (otp != null && RegExp(r'^\d{6}$').hasMatch(otp)) {
+      await ref
+          .read(vendorRepositoryProvider)
+          .verifyBookingCompletionOtp(booking['id'].toString(), otp);
+    }
     ref.invalidate(vendorBookingsProvider);
   }
 

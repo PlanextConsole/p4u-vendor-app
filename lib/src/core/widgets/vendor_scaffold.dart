@@ -40,7 +40,7 @@ class VendorScaffold extends ConsumerWidget {
   static bool isBlockedForVendor(String path, VendorUser? vendor) {
     if (vendor == null || vendor.isBothVendor) return false;
     const serviceOnly = {'/services', '/availability', '/bookings'};
-    const productOnly = {'/products', '/orders'};
+    const productOnly = {'/products', '/orders', '/food'};
     if (vendor.isProductVendor && serviceOnly.contains(path)) return true;
     if (vendor.isServiceVendor && productOnly.contains(path)) return true;
     return false;

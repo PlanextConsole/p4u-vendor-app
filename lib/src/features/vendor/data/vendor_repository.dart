@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/services/api_client.dart';
@@ -56,6 +56,12 @@ class VendorRepository {
     final rows = await _safeList(
         () => _api.getList('/api/v1/vendor/me/products', auth: true));
     return rows.map(_normalizeProduct).toList();
+  }
+
+  Future<Map<String, dynamic>> product(String id) async {
+    final row =
+        await _api.getJson('/api/v1/vendor/me/products/$id', auth: true);
+    return _normalizeProduct(row);
   }
 
   Future<String?> checkVendorPhoneUnique(String phone) async {
@@ -225,6 +231,16 @@ class VendorRepository {
     );
   }
 
+  Future<void> updateProductReturn(String id, String action,
+      {String? note}) async {
+    await _api.patchJson('/api/v1/vendor/orders/$id/return',
+        body: {
+          'action': action,
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim()
+        },
+        auth: true);
+  }
+
   Future<List<Map<String, dynamic>>> bookings(String vendorId) async {
     final rows = await _safeList(() => _api.getList('/api/v1/vendor/bookings',
         query: {'limit': 50, 'offset': 0}, auth: true));
@@ -245,14 +261,19 @@ class VendorRepository {
   Future<void> completeBooking(String id, File photo, String notes) async {
     final uploaded = await uploadVendorAsset('', photo, 'service-completions',
         photo.path.split(RegExp(r'[\\/]')).last, 'image/jpeg');
-    await _api.patchJson(
-      '/api/v1/vendor/bookings/$id',
+    await _api.postJson(
+      '/api/v1/vendor/bookings/$id/completion-proof',
       body: {
-        'status': 'completed',
-        'metadata': {'completionPhotoUrl': uploaded, 'completionNotes': notes},
+        'photoUrls': [uploaded],
+        'notes': notes
       },
       auth: true,
     );
+  }
+
+  Future<void> verifyBookingCompletionOtp(String id, String otp) async {
+    await _api.postJson('/api/v1/vendor/bookings/$id/completion-otp',
+        body: {'otp': otp}, auth: true);
   }
 
   Future<List<Map<String, dynamic>>> settlements(String vendorId) async {
@@ -301,6 +322,52 @@ class VendorRepository {
     return _safeList(() => _api.getList('/api/v1/vendor/me/plans', auth: true));
   }
 
+  Future<Map<String, dynamic>> startPlanCheckout(String planId) =>
+      _api.postJson('/api/v1/vendor/me/plan/checkout',
+          body: {'planId': planId}, auth: true);
+
+  Future<Map<String, dynamic>> verifyPlanPayment({
+    required String planId,
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) =>
+      _api.postJson('/api/v1/vendor/me/plan/verify',
+          body: {
+            'planId': planId,
+            'razorpay_order_id': orderId,
+            'razorpay_payment_id': paymentId,
+            'razorpay_signature': signature,
+          },
+          auth: true);
+
+  Future<Map<String, dynamic>> dropshippingSettings() =>
+      _api.getJson('/api/v1/vendor/me/dropshipping/settings', auth: true);
+
+  Future<Map<String, dynamic>> saveDropshippingSettings(
+          Map<String, dynamic> values) =>
+      _api.putJson('/api/v1/vendor/me/dropshipping/settings',
+          body: values, auth: true);
+
+  Future<List<Map<String, dynamic>>> dropshippingSuppliers() =>
+      _api.getList('/api/v1/vendor/me/dropshipping/suppliers', auth: true);
+
+  Future<List<Map<String, dynamic>>> dropshippingOrders() =>
+      _api.getList('/api/v1/vendor/me/dropshipping/orders', auth: true);
+
+  Future<Map<String, dynamic>> createDropshippingOrder(String orderId) =>
+      _api.postJson(
+          '/api/v1/vendor/me/dropshipping/orders/from-commerce/$orderId',
+          body: const {},
+          auth: true);
+
+  Future<Map<String, dynamic>> forwardDropshippingOrder(String id) =>
+      _api.postJson('/api/v1/vendor/me/dropshipping/orders/$id/forward',
+          body: const {}, auth: true);
+
+  Future<Map<String, dynamic>> cancelDropshippingOrder(String id) =>
+      _api.patchJson('/api/v1/vendor/me/dropshipping/orders/$id/status',
+          body: const {'status': 'cancelled'}, auth: true);
   Future<Map<String, dynamic>> profile(String vendorId) async {
     final data =
         await _safeMap(() => _api.getJson('/api/v1/vendor/me', auth: true));
@@ -381,8 +448,9 @@ class VendorRepository {
     final rows = <Map<String, dynamic>>[];
     if (weekly is Map) {
       weekly.forEach((key, value) {
-        final slot =
-            value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+        final slot = value is Map
+            ? Map<String, dynamic>.from(value)
+            : <String, dynamic>{};
         final start = _hhmm(slot['start']?.toString() ?? '09:00');
         final end = _hhmm(slot['end']?.toString() ?? '18:00');
         // Primary window + any extra custom windows become the editor's slots.
@@ -550,6 +618,20 @@ class VendorRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> supportTickets() =>
+      _api.getList('/api/v1/vendor/support/tickets', auth: true);
+
+  Future<Map<String, dynamic>> supportTicket(String id) =>
+      _api.getJson('/api/v1/vendor/support/tickets/$id', auth: true);
+
+  Future<Map<String, dynamic>> sendSupportMessage(String id, String message) =>
+      _api.postJson('/api/v1/vendor/support/tickets/$id/messages',
+          body: {'message': message}, auth: true);
+
+  Future<Map<String, dynamic>> closeSupportTicket(String id) =>
+      _api.patchJson('/api/v1/vendor/support/tickets/$id/close',
+          body: const {}, auth: true);
+
   Future<void> createSupportTicket({
     required String vendorId,
     required String vendorName,
@@ -558,24 +640,13 @@ class VendorRepository {
     required String category,
     required String priority,
   }) async {
-    final vendor = await profile(vendorId);
-    final metadata = vendor['metadata'] is Map
-        ? Map<String, dynamic>.from(vendor['metadata'] as Map)
-        : <String, dynamic>{};
-    final tickets = apiItems(metadata['supportTickets']);
-    tickets.insert(0, {
-      'id': 'ticket-${DateTime.now().millisecondsSinceEpoch}',
-      'vendorName': vendorName,
-      'subject': subject,
-      'description': description,
-      'category': category,
-      'priority': priority,
-      'status': 'open',
-      'createdAt': DateTime.now().toIso8601String(),
-    });
-    await _api.patchJson('/api/v1/vendor/me',
+    await _api.postJson('/api/v1/vendor/support/tickets',
         body: {
-          'metadata': {...metadata, 'supportTickets': tickets}
+          'subject': subject,
+          'message': description,
+          'category': category,
+          'priority': priority,
+          'metadata': {'vendorName': vendorName}
         },
         auth: true);
   }
@@ -633,16 +704,14 @@ class VendorRepository {
             ? null
             : _phone(form.s('secondary_phone')),
         'facebook': form.s('fb_link').isEmpty ? null : form.s('fb_link'),
-        'instagram': form.s('instagram_link').isEmpty
-            ? null
-            : form.s('instagram_link'),
+        'instagram':
+            form.s('instagram_link').isEmpty ? null : form.s('instagram_link'),
         'latitude': form['latitude'],
         'longitude': form['longitude'],
       },
       'documentsJson': {
-        'storeLogo': form.s('store_logo_url').isEmpty
-            ? null
-            : form.s('store_logo_url'),
+        'storeLogo':
+            form.s('store_logo_url').isEmpty ? null : form.s('store_logo_url'),
         'gstCertificateFileName': form.s('gst_certificate_url').isEmpty
             ? null
             : form.s('gst_certificate_url'),
@@ -653,15 +722,12 @@ class VendorRepository {
             ? null
             : form.s('gst_certificate_url'),
         'fssai': form.s('fssai_url').isEmpty ? null : form.s('fssai_url'),
-        'panCardFileName': form.s('pan_image_url').isEmpty
-            ? null
-            : form.s('pan_image_url'),
-        'panImage': form.s('pan_image_url').isEmpty
-            ? null
-            : form.s('pan_image_url'),
-        'panCardUrl': form.s('pan_image_url').isEmpty
-            ? null
-            : form.s('pan_image_url'),
+        'panCardFileName':
+            form.s('pan_image_url').isEmpty ? null : form.s('pan_image_url'),
+        'panImage':
+            form.s('pan_image_url').isEmpty ? null : form.s('pan_image_url'),
+        'panCardUrl':
+            form.s('pan_image_url').isEmpty ? null : form.s('pan_image_url'),
         'aadhaarFront': form.s('aadhaar_front_url').isEmpty
             ? null
             : form.s('aadhaar_front_url'),
@@ -675,6 +741,7 @@ class VendorRepository {
       'bankJson': _bankPayload(form),
     };
   }
+
   Map<String, dynamic> _productPayload(Map<String, dynamic> values) {
     final price = values.n('price');
     final discount = values.n('discount');
@@ -686,7 +753,8 @@ class VendorRepository {
     return {
       'name': values.s('title', values.s('name')),
       'categoryId': values.s('category_id', values.s('categoryId')),
-      if (values.s('taxConfigurationId', values.s('tax_configuration_id'))
+      if (values
+          .s('taxConfigurationId', values.s('tax_configuration_id'))
           .isNotEmpty)
         'taxConfigurationId':
             values.s('taxConfigurationId', values.s('tax_configuration_id')),
@@ -702,11 +770,12 @@ class VendorRepository {
       'metadata': {
         ...existingMeta,
         'sku': values.s('sku', existingMeta.s('sku')),
-        'productType':
-            values.s('productType', existingMeta.s('productType', 'simple')),
+        'productType': values.s('product_type',
+            values.s('productType', existingMeta.s('productType', 'simple'))),
         'quantity': stock,
         'stock': stock,
       },
+      if (values['variations'] is List) 'variations': values['variations'],
     };
   }
 
@@ -760,6 +829,9 @@ class VendorRepository {
       body['phone'] = values['mobile'] ?? values['phone'];
     }
     if (values['bankJson'] != null) body['bankJson'] = values['bankJson'];
+    if (values['documentsJson'] != null) {
+      body['documentsJson'] = values['documentsJson'];
+    }
     if (values['status'] != null) body['status'] = values['status'];
     if (values['notes'] != null) body['notes'] = values['notes'];
 
@@ -801,7 +873,8 @@ class VendorRepository {
   /// Registration / onboarding: persist a single primary account in the
   /// versioned `{ version: 1, accounts: [...] }` shape used by the bank page.
   Map<String, dynamic> _bankPayload(Map<String, dynamic> values) {
-    final row = bankAccountFromForm(values, id: newBankAccountId(), isPrimary: true);
+    final row =
+        bankAccountFromForm(values, id: newBankAccountId(), isPrimary: true);
     final hasAny = (row['bankName'] as String).isNotEmpty ||
         (row['accountHolderName'] as String).isNotEmpty ||
         (row['accountNumber'] as String).isNotEmpty ||
@@ -816,7 +889,8 @@ class VendorRepository {
     final vendorType = _vendorType(row);
     final addressJson = row['addressJson'] ?? row['address_json'];
     final area = addressJson is Map
-        ? (addressJson['areaLocality'] ?? addressJson['address'] ?? '').toString()
+        ? (addressJson['areaLocality'] ?? addressJson['address'] ?? '')
+            .toString()
         : '';
     return {
       ...row,
@@ -825,9 +899,8 @@ class VendorRepository {
       'business_name':
           row.s('business_name', row.s('businessName', row.s('storeName'))),
       'mobile': row.s('mobile', row.s('phone')),
-      'shop_address': row.s('shop_address').isNotEmpty
-          ? row.s('shop_address')
-          : area,
+      'shop_address':
+          row.s('shop_address').isNotEmpty ? row.s('shop_address') : area,
       'vendorType': vendorType,
       'vendor_type': vendorType,
       'vendorKind': vendorType,
@@ -876,8 +949,11 @@ class VendorRepository {
       ])),
       'status': status,
       'moderation_status': moderation,
+      'product_type': meta.s('productType', 'simple'),
+      'variations': row['variations'] is List ? row['variations'] : const [],
     };
   }
+
   Map<String, dynamic> _normalizeService(Map<String, dynamic> row) {
     final metadata = _metadata(row);
     final catalogMeta =
@@ -914,7 +990,8 @@ class VendorRepository {
       'price': row.n('price', row.n('basePrice', row.n('base_price'))),
       'base_price': _firstNonEmpty([metadata['referenceBasePrice'], priceStr]),
       'price_type': _metaStr(metadata, 'priceType', 'fixed'),
-      'duration': _firstNonEmpty([metadata['duration'], catalogMeta['duration']]),
+      'duration':
+          _firstNonEmpty([metadata['duration'], catalogMeta['duration']]),
       'city': _metaStr(metadata, 'city'),
       'trending': metadata['trending'] == true,
       'emergency': metadata['emergency'] == true,
@@ -1389,4 +1466,3 @@ extension _MapRead on Map<String, dynamic> {
 
   int i(String key, [int fallback = 0]) => n(key, fallback).round();
 }
-

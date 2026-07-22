@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,6 +20,14 @@ Future<void> _initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 8));
+    void open(RemoteMessage m) {
+      final link = m.data['deepLink'];
+      if (link != null) openVendorDeepLink(link);
+    }
+
+    FirebaseMessaging.onMessageOpenedApp.listen(open);
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) open(initial);
   } catch (e, stackTrace) {
     debugPrint('Firebase init failed: $e\n$stackTrace');
   }

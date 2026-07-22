@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/services/api_client.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/metric_card.dart';
@@ -169,111 +170,47 @@ class _ReviewsPageState extends ConsumerState<_ReviewsPage> {
   }
 }
 
-class _SupportPage extends ConsumerWidget {
+class _SupportPage extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return VendorScaffold(
-      title: 'Support',
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const EmptyState(
-              icon: Icons.help_outline_rounded,
-              title: 'Need help?',
-              subtitle: 'Create a support request from here.'),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-              onPressed: () => _createTicket(context, ref),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Create Ticket')),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _createTicket(BuildContext context, WidgetRef ref) async {
-    final vendor = ref.read(authStateProvider).valueOrNull;
-    if (vendor == null) return;
-    final subject = TextEditingController();
-    final description = TextEditingController();
-    var category = 'vendor';
-    var priority = 'medium';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Create Support Ticket'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                  controller: subject,
-                  decoration: const InputDecoration(labelText: 'Subject')),
-              const SizedBox(height: 10),
-              TextField(
-                  controller: description,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: const InputDecoration(labelText: 'Description')),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: const [
-                  DropdownMenuItem(value: 'vendor', child: Text('Vendor')),
-                  DropdownMenuItem(value: 'orders', child: Text('Orders')),
-                  DropdownMenuItem(value: 'payments', child: Text('Payments')),
-                  DropdownMenuItem(
-                      value: 'technical', child: Text('Technical')),
-                ],
-                onChanged: (v) => category = v ?? category,
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: priority,
-                decoration: const InputDecoration(labelText: 'Priority'),
-                items: const [
-                  DropdownMenuItem(value: 'low', child: Text('Low')),
-                  DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                  DropdownMenuItem(value: 'high', child: Text('High')),
-                ],
-                onChanged: (v) => priority = v ?? priority,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Submit')),
-        ],
-      ),
-    );
-    if (ok != true ||
-        subject.text.trim().isEmpty ||
-        description.text.trim().isEmpty) {
-      return;
-    }
-    await ref.read(vendorRepositoryProvider).createSupportTicket(
-          vendorId: vendor.id,
-          vendorName: vendor.businessName.isNotEmpty
-              ? vendor.businessName
-              : vendor.name,
-          subject: subject.text.trim(),
-          description: description.text.trim(),
-          category: category,
-          priority: priority,
-        );
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Support ticket created')));
-    }
-  }
+  ConsumerState<_SupportPage> createState() => _SupportPageState();
 }
 
+class _SupportPageState extends ConsumerState<_SupportPage> {
+  Future<void> _openTicket(Map<String, dynamic> ticket) async {
+    var detail = await ref.read(vendorRepositoryProvider).supportTicket('${ticket['id']}');
+    if (!mounted) return;
+    final reply = TextEditingController();
+    await showDialog<void>(context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, update) {
+      final messages = apiItems(detail['messages']);
+      final terminal = ['closed', 'resolved'].contains('${detail['status']}');
+      return AlertDialog(title: Text('${detail['subject']}'), content: SizedBox(width: 480, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Flexible(child: ListView(shrinkWrap: true, children: messages.map((m) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: '${m['sender_type']}' == 'admin' ? Colors.teal.shade50 : Colors.grey.shade100, borderRadius: BorderRadius.circular(10)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${m['sender_type']}' == 'admin' ? 'Support' : 'You', style: const TextStyle(fontWeight: FontWeight.bold)), Text('${m['message']}')]))).toList())),
+        if (!terminal) Row(children: [Expanded(child: TextField(controller: reply, decoration: const InputDecoration(hintText: 'Reply to support'))), IconButton(onPressed: () async { if (reply.text.trim().length < 2) return; detail = await ref.read(vendorRepositoryProvider).sendSupportMessage('${detail['id']}', reply.text.trim()); reply.clear(); update(() {}); setState(() {}); }, icon: const Icon(Icons.send_rounded))])
+      ])), actions: [if (!terminal) TextButton(onPressed: () async { detail = await ref.read(vendorRepositoryProvider).closeSupportTicket('${detail['id']}'); update(() {}); setState(() {}); }, child: const Text('Close ticket')), TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Done'))]);
+    }));
+  }
+
+  @override
+  Widget build(BuildContext context) => VendorScaffold(title: 'Support', child: ListView(padding: const EdgeInsets.all(16), children: [
+    FilledButton.icon(onPressed: _createTicket, icon: const Icon(Icons.add_rounded), label: const Text('Create Ticket')),
+    const SizedBox(height: 16),
+    FutureBuilder<List<Map<String, dynamic>>>(future: ref.read(vendorRepositoryProvider).supportTickets(), builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+      final tickets = snapshot.data ?? [];
+      if (tickets.isEmpty) return const EmptyState(icon: Icons.help_outline_rounded, title: 'No support tickets', subtitle: 'Create a request when you need help.');
+      return Column(children: tickets.map((t) => Padding(padding: const EdgeInsets.only(bottom: 8), child: AppCard(child: ListTile(contentPadding: EdgeInsets.zero, title: Text('${t['subject']}', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${t['category']} · ${t['priority']}'), trailing: Text('${t['status']}'.replaceAll('_', ' ')), onTap: () => _openTicket(t))))).toList());
+    })
+  ]));
+
+  Future<void> _createTicket() async {
+    final vendor = ref.read(authStateProvider).valueOrNull; if (vendor == null) return;
+    final subject=TextEditingController(),description=TextEditingController(); var category='vendor',priority='medium';
+    final ok=await showDialog<bool>(context:context,builder:(_)=>AlertDialog(title:const Text('Create Support Ticket'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:subject,decoration:const InputDecoration(labelText:'Subject')),const SizedBox(height:10),TextField(controller:description,minLines:3,maxLines:5,decoration:const InputDecoration(labelText:'Description')),const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:category,decoration:const InputDecoration(labelText:'Category'),items:const [DropdownMenuItem(value:'vendor',child:Text('Vendor')),DropdownMenuItem(value:'orders',child:Text('Orders')),DropdownMenuItem(value:'payments',child:Text('Payments')),DropdownMenuItem(value:'technical',child:Text('Technical'))],onChanged:(v)=>category=v??category),const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:priority,decoration:const InputDecoration(labelText:'Priority'),items:const [DropdownMenuItem(value:'low',child:Text('Low')),DropdownMenuItem(value:'medium',child:Text('Medium')),DropdownMenuItem(value:'high',child:Text('High'))],onChanged:(v)=>priority=v??priority)])),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(context,true),child:const Text('Submit'))]));
+    if(ok!=true||subject.text.trim().length<4||description.text.trim().length<2)return;
+    await ref.read(vendorRepositoryProvider).createSupportTicket(vendorId:vendor.id,vendorName:vendor.businessName.isNotEmpty?vendor.businessName:vendor.name,subject:subject.text.trim(),description:description.text.trim(),category:category,priority:priority);
+    if(mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Support ticket created')));setState((){});}
+  }
+}
 class _NotificationsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {

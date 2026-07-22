@@ -176,6 +176,13 @@ class _OrderList extends ConsumerWidget {
           final next = flow[status];
           final orderItems =
               order['items'] is List ? order['items'] as List : const [];
+          final metadata = order['metadata'] is Map
+              ? Map<String, dynamic>.from(order['metadata'] as Map)
+              : <String, dynamic>{};
+          final returnRequest = metadata['returnRequest'] is Map
+              ? Map<String, dynamic>.from(metadata['returnRequest'] as Map)
+              : <String, dynamic>{};
+          final returnStatus = returnRequest['status']?.toString() ?? '';
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: AppCard(
@@ -212,6 +219,49 @@ class _OrderList extends ConsumerWidget {
                         'Shipping: ${order['shipping_type']} ${order['tracking_number'] ?? ''}',
                         style: const TextStyle(fontSize: 12)),
                   ],
+                  if (returnRequest.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Customer return request',
+                                style: TextStyle(fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 4),
+                            Text(
+                                returnRequest['reason']?.toString() ??
+                                    'No reason provided',
+                                style: const TextStyle(fontSize: 12)),
+                            const SizedBox(height: 6),
+                            Text('Status: ${returnStatus.replaceAll('_', ' ')}',
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 8),
+                            Wrap(spacing: 8, children: [
+                              if (returnStatus == 'requested') ...[
+                                FilledButton(
+                                    onPressed: () => _updateReturn(
+                                        context, ref, order, 'approve'),
+                                    child: const Text('Approve')),
+                                OutlinedButton(
+                                    onPressed: () => _updateReturn(
+                                        context, ref, order, 'reject'),
+                                    child: const Text('Reject'))
+                              ],
+                              if (returnStatus == 'approved')
+                                FilledButton(
+                                    onPressed: () => _updateReturn(
+                                        context, ref, order, 'received'),
+                                    child: const Text('Mark received')),
+                            ]),
+                          ]),
+                    ),
+                  ],
                   if (next != null) ...[
                     const SizedBox(height: 12),
                     Wrap(
@@ -244,6 +294,35 @@ class _OrderList extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _updateReturn(BuildContext context, WidgetRef ref,
+      Map<String, dynamic> order, String action) async {
+    final controller = TextEditingController();
+    final note = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+              title: Text(
+                  '${action[0].toUpperCase()}${action.substring(1)} return'),
+              content: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(labelText: 'Optional note'),
+                  minLines: 2,
+                  maxLines: 3),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(context, controller.text),
+                    child: const Text('Confirm'))
+              ],
+            ));
+    if (note == null) return;
+    await ref
+        .read(vendorRepositoryProvider)
+        .updateProductReturn(order['id'].toString(), action, note: note);
+    ref.invalidate(vendorOrdersProvider);
   }
 
   Future<void> _update(BuildContext context, WidgetRef ref,

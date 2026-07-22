@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/api_client.dart';
@@ -20,6 +21,18 @@ class AuthRepository {
   final ApiClient _api;
 
   Stream<void> get authChanges => apiSession.changes;
+
+  Future<void> _registerPush() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission();
+      final token = await messaging.getToken();
+      if (token != null) {
+        await _api.postJson('/api/v1/notifications/devices/register',
+            body: {'deviceToken': token, 'platform': 'flutter'}, auth: true);
+      }
+    } catch (_) {}
+  }
 
   Future<VendorUser?> currentVendor() async {
     if (!await apiSession.hasToken()) return null;
@@ -62,6 +75,7 @@ class AuthRepository {
       );
     }
     await apiSession.saveAuth(auth);
+    await _registerPush();
     final profile = await _safeProfile();
     if (profile != null) await apiSession.saveProfile(profile);
     return VendorUser.fromApi(profile ?? auth,

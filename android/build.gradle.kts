@@ -5,10 +5,17 @@ allprojects {
     }
 }
 
+val externalBuildDir = System.getenv("P4U_ANDROID_BUILD_DIR")?.trim().orEmpty()
 val newBuildDir: Directory =
-    rootProject.layout.buildDirectory
-        .dir("../../build")
-        .get()
+    if (externalBuildDir.isNotEmpty()) {
+        rootProject.layout.dir(
+            rootProject.provider { rootProject.file(externalBuildDir) },
+        ).get()
+    } else {
+        rootProject.layout.buildDirectory
+            .dir("../../build")
+            .get()
+    }
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {

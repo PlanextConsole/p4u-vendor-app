@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -129,6 +130,16 @@ class ProfilePage extends ConsumerWidget {
                           'unpaid'),
                     ],
                   ),
+                  Row(children: [
+                    TextButton.icon(
+                        onPressed: () => context.push('/plans'),
+                        icon: const Icon(Icons.workspace_premium_rounded),
+                        label: const Text('Manage plans')),
+                    TextButton.icon(
+                        onPressed: () => context.push('/kyc'),
+                        icon: const Icon(Icons.verified_user_rounded),
+                        label: const Text('KYC')),
+                  ]),
                   if (vendor['plan_transaction_id'] != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
