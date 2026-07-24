@@ -103,6 +103,12 @@ class _Section extends ConsumerWidget {
               ? Map<String, dynamic>.from(b['services'])
               : <String, dynamic>{};
           final status = b['status']?.toString() ?? 'pending';
+          final metadata = b['metadata'] is Map
+              ? Map<String, dynamic>.from(b['metadata'] as Map)
+              : <String, dynamic>{};
+          final serviceImage = _serviceImage(b, metadata, service);
+          final proofPhotos = _completionPhotoUrls(b, metadata);
+          final canCancel = status == 'approved' || status == 'in_progress';
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: AppCard(
@@ -110,9 +116,34 @@ class _Section extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          width: 52,
+                          height: 52,
+                          child: serviceImage.isNotEmpty
+                              ? Image.network(
+                                  serviceImage,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: Colors.black12,
+                                    child: const Icon(Icons.handyman, size: 20),
+                                  ),
+                                )
+                              : Container(
+                                  color: Colors.black12,
+                                  child: const Icon(Icons.handyman, size: 20),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
-                          child: Text(service['title']?.toString() ?? 'Service',
+                          child: Text(
+                              service['title']?.toString() ??
+                                  b['serviceName']?.toString() ??
+                                  'Service',
                               style: const TextStyle(
                                   fontWeight: FontWeight.w800))),
                       StatusBadge(status),
@@ -128,19 +159,19 @@ class _Section extends ConsumerWidget {
                         style: const TextStyle(
                             fontSize: 12, color: Colors.black54)),
                   const SizedBox(height: 10),
-                  Row(
+                  Text(
+                      currency.format(
+                          b['total_amount'] ?? service['price'] ?? 0),
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Expanded(
-                          child: Text(
-                              currency.format(
-                                  b['total_amount'] ?? service['price'] ?? 0),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800))),
                       if (status == 'pending') ...[
                         FilledButton(
                             onPressed: () => _update(ref, b, 'approved'),
                             child: const Text('Accept')),
-                        const SizedBox(width: 8),
                         OutlinedButton(
                             onPressed: () => _update(ref, b, 'rejected'),
                             child: const Text('Reject')),
@@ -153,14 +184,37 @@ class _Section extends ConsumerWidget {
                         FilledButton(
                             onPressed: () => _complete(context, ref, b),
                             child: const Text('Complete')),
+                      if (canCancel)
+                        OutlinedButton(
+                            onPressed: () => _update(ref, b, 'cancelled'),
+                            child: const Text('Cancel')),
                     ],
                   ),
-                  if (b['completion_photo_url'] != null) ...[
+                  if (proofPhotos.isNotEmpty) ...[
                     const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(b['completion_photo_url'],
-                          height: 100, width: 140, fit: BoxFit.cover),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: proofPhotos
+                          .take(3)
+                          .map(
+                            (url) => ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(url,
+                                  height: 100,
+                                  width: 140,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                        height: 100,
+                                        width: 140,
+                                        color: Colors.black12,
+                                        alignment: Alignment.center,
+                                        child: const Text('Photo',
+                                            style: TextStyle(fontSize: 12)),
+                                      )),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ],
                 ],
@@ -286,4 +340,62 @@ class _Section extends ConsumerWidget {
     final d = DateTime.tryParse(value?.toString() ?? '');
     return d == null ? '' : DateFormat('d MMM yyyy').format(d);
   }
+}
+
+String _serviceImage(
+  Map<String, dynamic> booking,
+  Map<String, dynamic> metadata,
+  Map<String, dynamic> service,
+) {
+  final candidates = [
+    booking['serviceImage'],
+    booking['service_image'],
+    metadata['serviceImage'],
+    metadata['service_image'],
+    metadata['imageUrl'],
+    service['image'],
+    service['imageUrl'],
+  ];
+  for (final c in candidates) {
+    final s = c?.toString().trim() ?? '';
+    if (s.isNotEmpty) return s;
+  }
+  return '';
+}
+
+List<String> _completionPhotoUrls(
+  Map<String, dynamic> booking,
+  Map<String, dynamic> metadata,
+) {
+  final urls = <String>[];
+  void add(Object? value) {
+    final s = value?.toString().trim() ?? '';
+    if (s.isNotEmpty && !urls.contains(s)) urls.add(s);
+  }
+
+  add(booking['completion_photo_url']);
+  add(booking['completionPhotoUrl']);
+  add(metadata['completion_photo_url']);
+  add(metadata['completionPhotoUrl']);
+
+  final proof = metadata['completionProof'] ??
+      metadata['completion_proof'] ??
+      booking['completionProof'] ??
+      booking['completion_proof'];
+  if (proof is Map) {
+    final photoUrls = proof['photoUrls'] ??
+        proof['photo_urls'] ??
+        proof['photos'] ??
+        proof['images'];
+    if (photoUrls is List) {
+      for (final u in photoUrls) {
+        add(u);
+      }
+    } else {
+      add(photoUrls);
+    }
+    add(proof['photoUrl']);
+    add(proof['photo_url']);
+  }
+  return urls;
 }

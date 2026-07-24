@@ -147,8 +147,9 @@ class _OrderList extends ConsumerWidget {
     'paid': ('accepted', 'Accept Order'),
     'new': ('accepted', 'Accept Order'),
     'accepted': ('in_progress', 'Start Processing'),
-    'in_progress': ('shipped', 'Mark Shipped'),
-    'shipped': ('delivered', 'Out for Delivery'),
+    // "Out for Delivery" must set shipped (not delivered). Delivered is separate.
+    'in_progress': ('shipped', 'Out for Delivery'),
+    'shipped': ('delivered', 'Mark Delivered'),
     'delivered': ('completed', 'Mark Completed'),
   };
 
@@ -183,111 +184,213 @@ class _OrderList extends ConsumerWidget {
               ? Map<String, dynamic>.from(metadata['returnRequest'] as Map)
               : <String, dynamic>{};
           final returnStatus = returnRequest['status']?.toString() ?? '';
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                          child: Text(_orderTitle(order),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800))),
-                      StatusBadge(status),
-                      const SizedBox(width: 8),
-                      Text(currency.format(order['total'] ?? 0),
-                          style: const TextStyle(fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                      '${order['customer_name'] ?? 'Customer'} - ${_date(order['created_at'])}',
-                      style:
-                          const TextStyle(fontSize: 12, color: Colors.black54)),
-                  const SizedBox(height: 8),
-                  ...orderItems.take(3).map((item) => Text(
-                      '${item['title'] ?? 'Item'} x ${item['qty'] ?? 1}',
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.black54))),
-                  if (order['shipping_type'] != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                        'Shipping: ${order['shipping_type']} ${order['tracking_number'] ?? ''}',
-                        style: const TextStyle(fontSize: 12)),
-                  ],
-                  if (returnRequest.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Customer return request',
-                                style: TextStyle(fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 4),
-                            Text(
-                                returnRequest['reason']?.toString() ??
-                                    'No reason provided',
-                                style: const TextStyle(fontSize: 12)),
-                            const SizedBox(height: 6),
-                            Text('Status: ${returnStatus.replaceAll('_', ' ')}',
-                                style: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 8),
-                            Wrap(spacing: 8, children: [
-                              if (returnStatus == 'requested') ...[
-                                FilledButton(
-                                    onPressed: () => _updateReturn(
-                                        context, ref, order, 'approve'),
-                                    child: const Text('Approve')),
-                                OutlinedButton(
-                                    onPressed: () => _updateReturn(
-                                        context, ref, order, 'reject'),
-                                    child: const Text('Reject'))
-                              ],
-                              if (returnStatus == 'approved')
-                                FilledButton(
-                                    onPressed: () => _updateReturn(
-                                        context, ref, order, 'received'),
-                                    child: const Text('Mark received')),
-                            ]),
-                          ]),
-                    ),
-                  ],
-                  if (next != null) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
+          final payMode = _paymentMode(order, metadata);
+          final payStatus = _paymentStatus(order, metadata);
+          final awaiting = _isAwaitingPayment(status, payMode, payStatus);
+          final phone = _customerPhone(order, metadata);
+          final address = _shippingAddress(order, metadata);
+          return Opacity(
+            opacity: awaiting ? 0.85 : 1,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        FilledButton(
-                          onPressed: () =>
-                              _update(context, ref, order, next.$1),
-                          child: Text(next.$2),
-                        ),
-                        if (const {
-                          'placed',
-                          'created',
-                          'pending',
-                          'paid',
-                          'new'
-                        }.contains(status))
-                          OutlinedButton(
-                            onPressed: () =>
-                                _update(context, ref, order, 'cancelled'),
-                            child: const Text('Reject'),
-                          ),
+                        Expanded(
+                            child: Text(_orderTitle(order),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800))),
+                        StatusBadge(status),
+                        const SizedBox(width: 8),
+                        Text(currency.format(order['total'] ?? 0),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w800)),
                       ],
                     ),
+                    if (awaiting) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'Awaiting payment',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.amber.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                        '${order['customer_name'] ?? order['customerName'] ?? 'Customer'} - ${_date(order['created_at'])}',
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54)),
+                    if (phone.isNotEmpty)
+                      Text('Phone: $phone',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.black54)),
+                    if (payMode.isNotEmpty || payStatus.isNotEmpty)
+                      Text(
+                          'Payment: ${_payModeLabel(payMode)}${payStatus.isNotEmpty ? ' · ${_payStatusLabel(payStatus, payMode)}' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: awaiting
+                                ? Colors.amber.shade900
+                                : Colors.black54,
+                            fontWeight: awaiting
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          )),
+                    if (address.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text('Address: $address',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.black54)),
+                    ],
+                    const SizedBox(height: 8),
+                    ...orderItems.take(3).map((item) {
+                      final map = item is Map
+                          ? Map<String, dynamic>.from(item)
+                          : <String, dynamic>{};
+                      final title =
+                          map['title'] ?? map['name'] ?? map['productName'] ?? 'Item';
+                      final qty = map['qty'] ?? map['quantity'] ?? 1;
+                      final image = (map['image'] ??
+                              map['imageUrl'] ??
+                              map['thumbnailUrl'] ??
+                              map['productImage'] ??
+                              '')
+                          .toString();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: image.isNotEmpty
+                                    ? Image.network(
+                                        image,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            Container(
+                                          color: Colors.black12,
+                                          child: const Icon(
+                                              Icons.image_not_supported,
+                                              size: 16),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: Colors.black12,
+                                        child: const Icon(Icons.inventory_2,
+                                            size: 16),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$title x $qty',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.black54),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    if (order['shipping_type'] != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                          'Shipping: ${order['shipping_type']} ${order['tracking_number'] ?? ''}',
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                    if (returnRequest.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Customer return request',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 4),
+                              Text(
+                                  returnRequest['reason']?.toString() ??
+                                      'No reason provided',
+                                  style: const TextStyle(fontSize: 12)),
+                              const SizedBox(height: 6),
+                              Text(
+                                  'Status: ${returnStatus.replaceAll('_', ' ')}',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 8),
+                              Wrap(spacing: 8, children: [
+                                if (returnStatus == 'requested') ...[
+                                  FilledButton(
+                                      onPressed: () => _updateReturn(
+                                          context, ref, order, 'approve'),
+                                      child: const Text('Approve')),
+                                  OutlinedButton(
+                                      onPressed: () => _updateReturn(
+                                          context, ref, order, 'reject'),
+                                      child: const Text('Reject'))
+                                ],
+                                if (returnStatus == 'approved')
+                                  FilledButton(
+                                      onPressed: () => _updateReturn(
+                                          context, ref, order, 'received'),
+                                      child: const Text('Mark received')),
+                              ]),
+                            ]),
+                      ),
+                    ],
+                    if (next != null) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          FilledButton(
+                            onPressed: () =>
+                                _update(context, ref, order, next.$1),
+                            child: Text(next.$2),
+                          ),
+                          if (const {
+                            'placed',
+                            'created',
+                            'pending',
+                            'paid',
+                            'new'
+                          }.contains(status))
+                            OutlinedButton(
+                              onPressed: () =>
+                                  _update(context, ref, order, 'cancelled'),
+                              child: const Text('Reject'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );
@@ -465,3 +568,93 @@ String _firstOrderText(Map<String, dynamic> row, List<String> keys) {
 bool _looksLikeUuid(String value) => RegExp(
       r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
     ).hasMatch(value.trim());
+
+String _paymentMode(Map<String, dynamic> order, Map<String, dynamic> meta) {
+  final raw = order['paymentMode'] ??
+      order['payment_mode'] ??
+      meta['paymentMode'] ??
+      meta['payment_mode'] ??
+      '';
+  return raw.toString().trim().toLowerCase();
+}
+
+String _paymentStatus(Map<String, dynamic> order, Map<String, dynamic> meta) {
+  final raw = order['paymentStatus'] ??
+      order['payment_status'] ??
+      meta['paymentStatus'] ??
+      meta['payment_status'] ??
+      '';
+  return raw.toString().trim().toLowerCase();
+}
+
+bool _isAwaitingPayment(String status, String mode, String payStatus) {
+  if (mode == 'cod' || payStatus == 'cod' || payStatus == 'paid') return false;
+  return status == 'created' || payStatus == 'pending';
+}
+
+String _payModeLabel(String mode) {
+  if (mode.isEmpty) return '—';
+  if (mode == 'cod') return 'COD';
+  return mode.toUpperCase();
+}
+
+String _payStatusLabel(String status, String mode) {
+  if (mode == 'cod' || status == 'cod') return 'COD';
+  if (status.isEmpty) return '—';
+  return status.replaceAll('_', ' ');
+}
+
+String _customerPhone(Map<String, dynamic> order, Map<String, dynamic> meta) {
+  final fromOrder = [
+    order['customerPhone'],
+    order['customer_phone'],
+    order['phone'],
+  ];
+  for (final v in fromOrder) {
+    final s = v?.toString().trim() ?? '';
+    if (s.isNotEmpty) return s;
+  }
+  final fromMeta = [
+    meta['customerPhone'],
+    meta['customer_phone'],
+  ];
+  for (final v in fromMeta) {
+    final s = v?.toString().trim() ?? '';
+    if (s.isNotEmpty) return s;
+  }
+  final addr = meta['shippingAddress'] ?? meta['shipping_address'];
+  if (addr is Map) {
+    final phone = addr['phone']?.toString().trim() ?? '';
+    if (phone.isNotEmpty) return phone;
+  }
+  final customer = meta['customer'];
+  if (customer is Map) {
+    final phone =
+        (customer['phone'] ?? customer['mobile'])?.toString().trim() ?? '';
+    if (phone.isNotEmpty) return phone;
+  }
+  return '';
+}
+
+String _shippingAddress(Map<String, dynamic> order, Map<String, dynamic> meta) {
+  final raw = order['shippingAddress'] ??
+      order['shipping_address'] ??
+      meta['shippingAddress'] ??
+      meta['shipping_address'] ??
+      meta['address'];
+  if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+  if (raw is! Map) return '';
+  final a = Map<String, dynamic>.from(raw);
+  final parts = <String>[
+    (a['fullName'] ?? a['name'] ?? '').toString().trim(),
+    (a['line1'] ?? a['addressLine1'] ?? a['street'] ?? '').toString().trim(),
+    (a['line2'] ?? a['addressLine2'] ?? '').toString().trim(),
+    [
+      (a['city'] ?? '').toString().trim(),
+      (a['state'] ?? '').toString().trim(),
+    ].where((s) => s.isNotEmpty).join(', '),
+    (a['pincode'] ?? a['postalCode'] ?? a['zip'] ?? '').toString().trim(),
+    (a['country'] ?? '').toString().trim(),
+  ].where((s) => s.isNotEmpty).toList();
+  return parts.join(', ');
+}

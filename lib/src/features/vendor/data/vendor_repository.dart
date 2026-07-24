@@ -1048,6 +1048,30 @@ class VendorRepository {
     final customer = _customerName(row, metadata);
     final displayRef = _displayOrderRef(row, metadata);
     final title = _orderTitle(row, metadata, lines, customer, displayRef);
+    final paymentMode = _firstNonEmpty([
+      row['paymentMode'],
+      row['payment_mode'],
+      metadata['paymentMode'],
+      metadata['payment_mode'],
+    ]);
+    final paymentStatus = _firstNonEmpty([
+      row['paymentStatus'],
+      row['payment_status'],
+      metadata['paymentStatus'],
+      metadata['payment_status'],
+    ]);
+    final customerPhone = _firstNonEmpty([
+      row['customerPhone'],
+      row['customer_phone'],
+      metadata['customerPhone'],
+      metadata['customer_phone'],
+      metadata['shippingAddress'] is Map
+          ? (metadata['shippingAddress'] as Map)['phone']
+          : null,
+      metadata['shipping_address'] is Map
+          ? (metadata['shipping_address'] as Map)['phone']
+          : null,
+    ]);
     return {
       ...row,
       'id': row.s('id', row.s('orderId')),
@@ -1057,10 +1081,16 @@ class VendorRepository {
       'title': title,
       'customer_name': customer,
       'customerName': customer,
+      'customerPhone': customerPhone,
+      'customer_phone': customerPhone,
       'items': lines,
       'total': row.n('total', row.n('totalAmount', row.n('grandTotal'))),
       'created_at': row.s('created_at', row.s('createdAt')),
-      'payment_status': row.s('payment_status', row.s('paymentStatus')),
+      'payment_status': paymentStatus,
+      'paymentStatus': paymentStatus,
+      'payment_mode': paymentMode,
+      'paymentMode': paymentMode,
+      'metadata': metadata,
     };
   }
 
@@ -1079,6 +1109,35 @@ class VendorRepository {
       row['title'],
     ]);
     final title = serviceName.isNotEmpty ? serviceName : 'Service booking';
+    final serviceImage = _resolveUrl(_firstNonEmpty([
+      metadata['serviceImage'],
+      metadata['service_image'],
+      metadata['imageUrl'],
+      row['serviceImage'],
+      row['service_image'],
+    ]));
+    final proof = metadata['completionProof'] ?? metadata['completion_proof'];
+    String completionPhoto = '';
+    if (proof is Map) {
+      final urls = proof['photoUrls'] ?? proof['photo_urls'] ?? proof['photos'];
+      if (urls is List && urls.isNotEmpty) {
+        completionPhoto = _resolveUrl(urls.first?.toString() ?? '');
+      } else {
+        completionPhoto = _resolveUrl(_firstNonEmpty([
+          proof['photoUrl'],
+          proof['photo_url'],
+          proof['completion_photo_url'],
+        ]));
+      }
+    }
+    if (completionPhoto.isEmpty) {
+      completionPhoto = _resolveUrl(_firstNonEmpty([
+        metadata['completion_photo_url'],
+        metadata['completionPhotoUrl'],
+        row['completion_photo_url'],
+        row['completionPhotoUrl'],
+      ]));
+    }
     return {
       ...row,
       'id': row.s('id', row.s('bookingId')),
@@ -1089,6 +1148,8 @@ class VendorRepository {
       'end_time': row.s('end_time'),
       'service_name': title,
       'serviceName': title,
+      'serviceImage': serviceImage,
+      'service_image': serviceImage,
       'order_title': title,
       'title': title,
       'customer_name': customer,
@@ -1096,9 +1157,14 @@ class VendorRepository {
       'total_amount': row.n('total_amount', row.n('totalAmount')),
       'totalAmount': row.n('totalAmount', row.n('total_amount')),
       'total': row.n('total', row.n('total_amount', row.n('totalAmount'))),
+      'completion_photo_url': completionPhoto,
+      'completionPhotoUrl': completionPhoto,
+      'metadata': metadata,
       'services': {
         'title': title,
-        'price': row.n('total_amount', row.n('totalAmount'))
+        'price': row.n('total_amount', row.n('totalAmount')),
+        'image': serviceImage,
+        'imageUrl': serviceImage,
       },
     };
   }
